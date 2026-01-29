@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { MEGA_MENUS, CATEGORIES } from '../menuData';
-import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History } from 'lucide-react';
+import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem } from '../types';
+import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, PinballGameState } from '../types';
 import { getAvatarColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
 import Toast from '../components/Toast';
 import HistoryModal from '../components/HistoryModal';
+import PinballModal from '../components/pinball/PinballModal';
 
 const OrderPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('커피');
@@ -18,6 +19,8 @@ const OrderPage = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [history, setHistory] = useState<OrderHistory[]>([]);
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
+  const [isPinballOpen, setIsPinballOpen] = useState<boolean>(false);
+  const [pinballGame, setPinballGame] = useState<PinballGameState | undefined>(undefined);
 
   const navigate = useNavigate();
   const groupId = localStorage.getItem('ssafy_groupId');
@@ -64,6 +67,9 @@ const OrderPage = () => {
 
         // 히스토리 로드
         setHistory(data.history || []);
+
+        // 핀볼 게임 상태 로드
+        setPinballGame(data.pinballGame);
       } else {
         alert('모임이 종료되었거나 존재하지 않습니다.');
         navigate('/');
@@ -210,6 +216,9 @@ const OrderPage = () => {
     ? favoriteMenus
     : MEGA_MENUS.filter(m => m.categoryUpper === selectedCategory);
 
+  // 핀볼 게임 참여자 (장바구니에 담은 사람들)
+  const pinballParticipants = [...new Set(cart.map(item => item.userName))];
+
   return (
     <div className="h-full flex flex-col bg-background relative">
       {/* 토스트 알림 */}
@@ -220,6 +229,15 @@ const OrderPage = () => {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         history={history}
+      />
+
+      {/* 핀볼 게임 모달 */}
+      <PinballModal
+        isOpen={isPinballOpen}
+        onClose={() => setIsPinballOpen(false)}
+        groupId={groupId || ''}
+        participants={pinballParticipants}
+        gameState={pinballGame}
       />
 
       <div className="bg-surface p-6 pb-4 sticky top-0 z-10 shadow-sm">
@@ -252,6 +270,14 @@ const OrderPage = () => {
               title="주문 히스토리"
             >
               <History size={20}/>
+            </button>
+            {/* 핀볼 게임 버튼 */}
+            <button
+              onClick={() => setIsPinballOpen(true)}
+              className="text-text-secondary hover:text-primary p-2 transition"
+              title="커피 내기 핀볼"
+            >
+              <Target size={20}/>
             </button>
             {/* 로그아웃 버튼 */}
             <button
