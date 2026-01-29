@@ -7,7 +7,7 @@ export const CAFE_LIST = [
   { id: 'compose', name: '컴포즈', img: '🟡' },
 ];
 
-export const CATEGORIES: string[] = ['커피', '디카페인', '음료', '티', '푸드', '상품'];
+export const CATEGORIES: string[] = ['즐겨찾기', '커피', '디카페인', '음료', '티', '푸드', '상품'];
 
 export const MEGA_MENUS: Menu[] = [
   // 1. 커피 > 에스프레소

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { GroupData } from '../types';
@@ -11,15 +11,25 @@ const LandingPage = () => {
   const [groupId, setGroupId] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
-  
+
   // 에러 및 상태 메시지
   const [idMsg, setIdMsg] = useState<{type: 'error'|'success'|'', text: string}>({type: '', text: ''});
   const [pwMsg, setPwMsg] = useState<{type: 'error'|'success'|'', text: string}>({type: '', text: ''});
-  
+
   // 카페 선택 모드
   const [step, setStep] = useState<'input' | 'cafe_select'>('input');
-  
+
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // URL 파라미터에서 group 감지
+  useEffect(() => {
+    const groupParam = searchParams.get('group');
+    if (groupParam) {
+      setGroupId(groupParam);
+      setIsJoin(true); // 참여하기 모드로 전환
+    }
+  }, [searchParams]);
 
   // 1. 모임 ID 실시간 검사 (Debounce 적용)
   useEffect(() => {
