@@ -1,25 +1,11 @@
-// 20가지 파스텔 톤 색상 팔레트
+import { FavoriteItem } from './types';
+
+// 20가지 파스텔 톤 색상 팔레트 (HEAD 버전 유지)
 const PASTEL_PALETTE = [
-  '#FFB3BA', // 벚꽃 분홍
-  '#FFDFBA', // 살구
-  '#FFFFBA', // 레몬 크림
-  '#BAFFC9', // 민트
-  '#BAE1FF', // 하늘
-  '#E2F0CB', // 라임
-  '#B5EAD7', // 옥색
-  '#C7CEEA', // 라벤더 블루
-  '#F0E68C', // 카키
-  '#FFD1DC', // 파우더 핑크
-  '#E6E6FA', // 라벤더
-  '#D8BFD8', // 엉겅퀴
-  '#FF9999', // 연한 빨강
-  '#FFCC99', // 연한 오렌지
-  '#99FF99', // 연한 초록
-  '#99CCFF', // 연한 파랑
-  '#CC99FF', // 연한 보라
-  '#FFB6C1', // 라이트 핑크
-  '#ADD8E6', // 라이트 블루
-  '#F08080'  // 라이트 코랄
+  '#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF', 
+  '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F0E68C', '#FFD1DC', 
+  '#E6E6FA', '#D8BFD8', '#FF9999', '#FFCC99', '#99FF99', 
+  '#99CCFF', '#CC99FF', '#FFB6C1', '#ADD8E6', '#F08080'
 ];
 
 // 이름을 입력받아 20가지 색상 중 하나를 고정적으로 반환
@@ -28,12 +14,48 @@ export const getAvatarColor = (name: string) => {
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  // 음수 처리 후 20으로 나눈 나머지 사용
   const index = Math.abs(hash) % PASTEL_PALETTE.length;
   return PASTEL_PALETTE[index];
 };
 
-// 배경색이 밝으므로 글자색은 어두운 색으로 반환 (가독성 위해)
+// 배경색이 밝으므로 글자색은 어두운 색으로 반환
 export const getTextContrastColor = () => {
   return '#374151'; // gray-700
+};
+
+// ========== 즐겨찾기 유틸 함수 (Remote 버전 추가) ==========
+const FAVORITES_KEY = 'ssafy_favorites';
+
+export const getFavorites = (): FavoriteItem[] => {
+  const stored = localStorage.getItem(FAVORITES_KEY);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+};
+
+export const addFavorite = (menuId: number, menuName: string): void => {
+  const favorites = getFavorites();
+  if (favorites.some(f => f.menuId === menuId)) return;
+
+  const newFavorite: FavoriteItem = {
+    menuId,
+    menuName,
+    addedAt: Date.now()
+  };
+  favorites.push(newFavorite);
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+};
+
+export const removeFavorite = (menuId: number): void => {
+  const favorites = getFavorites();
+  const filtered = favorites.filter(f => f.menuId !== menuId);
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(filtered));
+};
+
+export const isFavorite = (menuId: number): boolean => {
+  const favorites = getFavorites();
+  return favorites.some(f => f.menuId === menuId);
 };
