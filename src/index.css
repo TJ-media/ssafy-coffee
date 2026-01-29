@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 기본 폰트 및 배경 설정 */
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  /* 우리가 설정한 테마 색상 적용 */
+  @apply bg-background text-text-primary;
+}
+
+/* 크롬, 사파리, 오페라 스크롤바 숨기기 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* IE, 엣지, 파이어폭스 스크롤바 숨기기 */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
