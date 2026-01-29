@@ -24,6 +24,7 @@ export interface GroupData {
   createdAt?: any;
   cart: CartItem[];
   selectedCafe: string;
+  history?: OrderHistory[];
 }
 
 export interface GroupedCartItem {
@@ -32,4 +33,37 @@ export interface GroupedCartItem {
   price: number;
   menuName: string;
   option: OptionType;
+}
+
+// 즐겨찾기 아이템
+export interface FavoriteItem {
+  menuId: number;
+  menuName: string;
+  addedAt: number;
+}
+
+// 주문 히스토리 개별 아이템
+export interface HistoryItem {
+  menuName: string;
+  option: OptionType;
+  price: number;
+  count: number;
+  orderedBy: string[];
+}
+
+// 주문 히스토리
+export interface OrderHistory {
+  id: string;
+  orderedAt: any;
+  totalPrice: number;
+  totalItems: number;
+  items: HistoryItem[];
+  participants: string[];
+}
+
+// 토스트 메시지
+export interface ToastMessage {
+  id: string;
+  message: string;
+  type: 'info' | 'success' | 'warning';
 }

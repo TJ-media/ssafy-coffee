@@ -7,7 +7,7 @@ export const CAFE_LIST = [
   { id: 'compose', name: '컴포즈', img: '🟡' },
 ];
 
-export const CATEGORIES: string[] = ['커피', '디카페인', '음료', '티', '푸드', '상품'];
+export const CATEGORIES: string[] = ['즐겨찾기', '커피', '디카페인', '음료', '티', '푸드', '상품'];
 
 export const MEGA_MENUS: Menu[] = [
   // 1. 커피 > 에스프레소
@@ -124,6 +124,7 @@ export const MEGA_MENUS: Menu[] = [
   { id: 89, categoryUpper: '푸드', categoryLower: '베이커리', name: '크로크무슈', price: 3800, img: '🍰', hasOption: false },
   { id: 90, categoryUpper: '푸드', categoryLower: '케이크', name: '치즈케익', price: 3500, img: '🍰', hasOption: false },
   { id: 91, categoryUpper: '푸드', categoryLower: '케이크', name: '티라미수케익', price: 3500, img: '🍰', hasOption: false },
+//   { id: 91, categoryUpper: '푸드', categoryLower: '밥', name: '햇반', price: 150000, img: '🍚', hasOption: false },
 
   // 13. 상품
   { id: 92, categoryUpper: '상품', categoryLower: '굿즈', name: '엠지씨 머그', price: 9300, img: '🎁', hasOption: false },
