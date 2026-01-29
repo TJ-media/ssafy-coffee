@@ -5,7 +5,7 @@ import { MEGA_MENUS, CATEGORIES } from '../menuData';
 import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, PinballGameState } from '../types';
-import { getAvatarColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
+import { getAvatarColor, getTextContrastColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
 import Toast from '../components/Toast';
 import HistoryModal from '../components/HistoryModal';
 import PinballModal from '../components/pinball/PinballModal';
@@ -32,14 +32,17 @@ const OrderPage = () => {
   const cartFabRef = useRef<HTMLButtonElement>(null);
   const cartSheetRef = useRef<HTMLDivElement>(null);
 
-  // 새로운 기능 상태 (토스트, 히스토리, 즐겨찾기)
+  // 새로운 기능 상태 (토스트, 히스토리, 즐겨찾기, 핀볼)
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [history, setHistory] = useState<OrderHistory[]>([]);
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
+  
+  // 핀볼 관련 상태
   const [isPinballOpen, setIsPinballOpen] = useState<boolean>(false);
   const [pinballGame, setPinballGame] = useState<PinballGameState | undefined>(undefined);
-  const prevCartRef = useRef<CartItem[]>([]); // 실시간 알림용=
+  
+  const prevCartRef = useRef<CartItem[]>([]); // 실시간 알림용
 
   const navigate = useNavigate();
   const groupId = localStorage.getItem('ssafy_groupId');
@@ -63,7 +66,7 @@ const OrderPage = () => {
     return ['전체', ...lowers];
   }, [selectedCategory]);
 
-  // Firestore 구독 (장바구니 + 히스토리 + 실시간 알림)
+  // Firestore 구독 (장바구니 + 히스토리 + 실시간 알림 + 핀볼)
   useEffect(() => {
     if (!groupId || !userName) {
       navigate('/');
@@ -96,7 +99,7 @@ const OrderPage = () => {
         // 히스토리 업데이트
         setHistory(data.history || []);
 
-        // 핀볼 게임 상태 로드
+        // 핀볼 게임 상태 업데이트
         setPinballGame(data.pinballGame);
       } else {
         alert('모임이 종료되었거나 존재하지 않습니다.');
@@ -290,12 +293,19 @@ const OrderPage = () => {
 
   return (
     <div className="h-full flex flex-col bg-background relative overflow-hidden">
-      {/* 1. 기능 오버레이들 */}
+      {/* 1. 기능 오버레이들 (토스트, 히스토리, 핀볼) */}
       <Toast toasts={toasts} removeToast={removeToast} />
       <HistoryModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         history={history}
+      />
+      <PinballModal
+        isOpen={isPinballOpen}
+        onClose={() => setIsPinballOpen(false)}
+        groupId={groupId || ''}
+        participants={pinballParticipants}
+        gameState={pinballGame}
       />
       
       {/* 2. 애니메이션 레이어 */}
@@ -341,20 +351,10 @@ const OrderPage = () => {
         </div>
       ))}
 
-      {/* 핀볼 게임 모달 */}
-      <PinballModal
-        isOpen={isPinballOpen}
-        onClose={() => setIsPinballOpen(false)}
-        groupId={groupId || ''}
-        participants={pinballParticipants}
-        gameState={pinballGame}
-      />
-
-      <div className="bg-surface p-6 pb-4 sticky top-0 z-10 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
       {/* 3. 상단 헤더 영역 */}
       <div className="bg-surface sticky top-0 z-10 shadow-sm">
         <div className="flex justify-between items-center p-6 pb-2">
+          {/* 유저 정보 */}
           <div className="flex items-center gap-3">
             <div 
               className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-inner"
@@ -368,14 +368,15 @@ const OrderPage = () => {
             </div>
           </div>
           
+          {/* 상단 버튼들 */}
           <div className="flex items-center gap-1">
-            <button onClick={copyShareLink} className="text-text-secondary hover:text-primary p-2 transition">
+            <button onClick={copyShareLink} className="text-text-secondary hover:text-primary p-2 transition" title="공유 링크 복사">
               <Link size={20}/>
             </button>
-            <button onClick={() => setIsHistoryOpen(true)} className="text-text-secondary hover:text-primary p-2 transition">
+            <button onClick={() => setIsHistoryOpen(true)} className="text-text-secondary hover:text-primary p-2 transition" title="주문 히스토리">
               <History size={20}/>
             </button>
-            {/* 핀볼 게임 버튼 */}
+            {/* 핀볼 게임 버튼 추가 */}
             <button
               onClick={() => setIsPinballOpen(true)}
               className="text-text-secondary hover:text-primary p-2 transition"
@@ -383,12 +384,7 @@ const OrderPage = () => {
             >
               <Target size={20}/>
             </button>
-            {/* 로그아웃 버튼 */}
-            <button
-              onClick={handleLogout}
-              className="text-text-secondary hover:text-danger p-2 transition"
-            >
-            <button onClick={handleLogout} className="text-text-secondary hover:text-danger p-2 transition">
+            <button onClick={handleLogout} className="text-text-secondary hover:text-danger p-2 transition" title="나가기">
               <LogOut size={20}/>
             </button>
           </div>
