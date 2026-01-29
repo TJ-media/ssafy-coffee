@@ -25,6 +25,7 @@ export interface GroupData {
   cart: CartItem[];
   selectedCafe: string;
   history?: OrderHistory[];
+  pinballGame?: PinballGameState;
 }
 
 export interface GroupedCartItem {
@@ -66,4 +67,14 @@ export interface ToastMessage {
   id: string;
   message: string;
   type: 'info' | 'success' | 'warning';
+}
+
+// 핀볼 게임 상태
+export interface PinballGameState {
+  status: 'idle' | 'ready' | 'playing' | 'finished';
+  participants: string[];
+  seed: number;
+  startedAt?: any;
+  winner?: string;
+  finishOrder?: string[];
 }
