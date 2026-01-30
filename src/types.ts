@@ -26,6 +26,7 @@ export interface GroupData {
   selectedCafe: string;
   history?: OrderHistory[];
   pinballGame?: PinballGameState;
+  rouletteGame?: RouletteGameState;
 }
 
 export interface GroupedCartItem {
@@ -69,12 +70,34 @@ export interface ToastMessage {
   type: 'info' | 'success' | 'warning';
 }
 
+// 핀볼 채팅 메시지
+export interface PinballChatMessage {
+  id: string;
+  userName: string;
+  message: string;
+  timestamp: number;
+}
+
 // 핀볼 게임 상태
 export interface PinballGameState {
-  status: 'idle' | 'ready' | 'playing' | 'finished';
+  status: 'idle' | 'waiting' | 'ready' | 'playing' | 'finished';
   participants: string[];
   seed: number;
   startedAt?: any;
   winner?: string;
   finishOrder?: string[];
+  chatMessages?: PinballChatMessage[];
+  hostName?: string; // 게임을 시작한 사람 (시작 버튼 권한)
+}
+
+// 룰렛 게임 상태
+export interface RouletteGameState {
+  status: 'idle' | 'waiting' | 'ready' | 'playing' | 'finished';
+  participants: string[];
+  seed: number;
+  startedAt?: any;
+  winner?: string;
+  finishOrder?: string[];
+  chatMessages?: PinballChatMessage[];
+  hostName?: string;
 }

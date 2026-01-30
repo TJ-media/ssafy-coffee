@@ -4,11 +4,11 @@ import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { MEGA_MENUS, CATEGORIES } from '../menuData';
 import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, PinballGameState } from '../types';
+import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, RouletteGameState } from '../types';
 import { getAvatarColor, getTextContrastColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
 import Toast from '../components/Toast';
 import HistoryModal from '../components/HistoryModal';
-import PinballModal from '../components/pinball/PinballModal';
+import RouletteModal from '../components/roulette/RouletteModal';
 
 // 애니메이션 아이템 타입 정의
 interface FlyingItem {
@@ -32,15 +32,14 @@ const OrderPage = () => {
   const cartFabRef = useRef<HTMLButtonElement>(null);
   const cartSheetRef = useRef<HTMLDivElement>(null);
 
-  // 새로운 기능 상태 (토스트, 히스토리, 즐겨찾기, 핀볼)
+  // 새로운 기능 상태 (토스트, 히스토리, 즐겨찾기, 룰렛)
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [history, setHistory] = useState<OrderHistory[]>([]);
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
   
-  // 핀볼 관련 상태
-  const [isPinballOpen, setIsPinballOpen] = useState<boolean>(false);
-  const [pinballGame, setPinballGame] = useState<PinballGameState | undefined>(undefined);
+  // 룰렛 관련 상태
+  const [rouletteGame, setRouletteGame] = useState<RouletteGameState | undefined>(undefined);
   
   const prevCartRef = useRef<CartItem[]>([]); // 실시간 알림용
 
@@ -66,7 +65,7 @@ const OrderPage = () => {
     return ['전체', ...lowers];
   }, [selectedCategory]);
 
-  // Firestore 구독 (장바구니 + 히스토리 + 실시간 알림 + 핀볼)
+  // Firestore 구독 (장바구니 + 히스토리 + 실시간 알림 + 룰렛)
   useEffect(() => {
     if (!groupId || !userName) {
       navigate('/');
@@ -99,8 +98,8 @@ const OrderPage = () => {
         // 히스토리 업데이트
         setHistory(data.history || []);
 
-        // 핀볼 게임 상태 업데이트
-        setPinballGame(data.pinballGame);
+        // 룰렛 게임 상태 업데이트
+        setRouletteGame(data.rouletteGame);
       } else {
         alert('모임이 종료되었거나 존재하지 않습니다.');
         navigate('/');
@@ -141,6 +140,44 @@ const OrderPage = () => {
     }
   };
 
+  // === 룰렛 게임 시작/종료 로직 ===
+  const handleStartRoulette = async () => {
+    const rouletteParticipants = [...new Set(cart.map(item => item.userName))];
+    if (rouletteParticipants.length < 2) {
+      addToast('커피 내기에는 2명 이상이 필요해요!', 'warning');
+      return;
+    }
+    if (!groupId) return;
+
+    const seed = Date.now();
+    const groupRef = doc(db, 'groups', groupId);
+
+    const newGameState: RouletteGameState = {
+      status: 'waiting', // 대기실로 이동 (시작 버튼을 눌러야 게임 시작)
+      participants: rouletteParticipants,
+      seed: seed,
+      startedAt: new Date(),
+      hostName: userName, // 게임을 연 사람이 호스트
+    };
+
+    await updateDoc(groupRef, {
+      rouletteGame: newGameState,
+    });
+  };
+
+  const handleEndRoulette = async () => {
+    if (!groupId) return;
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      rouletteGame: {
+        status: 'idle',
+        participants: [],
+        seed: 0,
+        chatMessages: [], // 채팅 메시지 초기화
+      },
+    });
+  };
+  
   // === 핵심 로직: 장바구니 담기 (애니메이션 포함) ===
   const handleAddToCart = async (e: React.MouseEvent, menu: Menu, option: OptionType) => {
     if (!groupId || !userName) return;
@@ -288,24 +325,26 @@ const OrderPage = () => {
     ? favoriteMenus
     : MEGA_MENUS.filter(m => m.categoryUpper === selectedCategory);
 
-  // 핀볼 게임 참여자 (장바구니에 담은 사람들)
-  const pinballParticipants = [...new Set(cart.map(item => item.userName))];
+  // 룰렛 게임 참여자 (장바구니에 담은 사람들)
+  const rouletteParticipants = [...new Set(cart.map(item => item.userName))];
+  const isRouletteModalOpen = !!(rouletteGame?.status && rouletteGame.status !== 'idle');
+
 
   return (
     <div className="h-full flex flex-col bg-background relative overflow-hidden">
-      {/* 1. 기능 오버레이들 (토스트, 히스토리, 핀볼) */}
+      {/* 1. 기능 오버레이들 (토스트, 히스토리, 룰렛) */}
       <Toast toasts={toasts} removeToast={removeToast} />
       <HistoryModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         history={history}
       />
-      <PinballModal
-        isOpen={isPinballOpen}
-        onClose={() => setIsPinballOpen(false)}
+      <RouletteModal
+        isOpen={isRouletteModalOpen}
+        onClose={handleEndRoulette}
         groupId={groupId || ''}
-        participants={pinballParticipants}
-        gameState={pinballGame}
+        participants={rouletteParticipants}
+        gameState={rouletteGame}
       />
       
       {/* 2. 애니메이션 레이어 */}
@@ -378,9 +417,9 @@ const OrderPage = () => {
             </button>
             {/* 핀볼 게임 버튼 추가 */}
             <button
-              onClick={() => setIsPinballOpen(true)}
+              onClick={handleStartRoulette}
               className="text-text-secondary hover:text-primary p-2 transition"
-              title="커피 내기 핀볼"
+              title="커피 내기 룰렛"
             >
               <Target size={20}/>
             </button>

@@ -1,118 +1,38 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, RotateCcw, Play, Users, Shuffle } from 'lucide-react';
+import { RouletteGameState, PinballChatMessage } from '../../types';
+import { Roulette } from './roulette';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { PinballGameState, PinballChatMessage } from '../../types';
-import { Box2dPhysics } from '../../utils/pinball/Box2dPhysics';
-import { createPinballStage } from '../../utils/pinball/maps';
-import { StageDef } from '../../utils/pinball/types';
 import { getAvatarColor, getTextContrastColor } from '../../utils';
-import PinballCanvasBox2D from './PinballCanvasBox2D';
-import PinballResult from './PinballResult';
-import PinballChat from './PinballChat';
 
-interface PinballModalProps {
+interface RouletteModalProps {
   isOpen: boolean;
   onClose: () => void;
   groupId: string;
   participants: string[];
-  gameState: PinballGameState | undefined;
+  gameState: RouletteGameState | undefined;
 }
 
-const PinballModal = ({
-  isOpen,
-  onClose,
-  groupId,
-  gameState,
-}: PinballModalProps) => {
-  const [physics, setPhysics] = useState<Box2dPhysics | null>(null);
-  const [stage, setStage] = useState<StageDef | null>(null);
-  const [countdown, setCountdown] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [localFinished, setLocalFinished] = useState(false);
-  const [isPhysicsReady, setIsPhysicsReady] = useState(false);
-  const physicsRef = useRef<Box2dPhysics | null>(null);
+const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId, participants, gameState }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rouletteInstance = useRef<Roulette | null>(null);
 
+  const [isRouletteReady, setIsRouletteReady] = useState(false);
+  const [countdown, setCountdown] = useState<number>(0);
   const status = gameState?.status || 'idle';
-  const chatMessages: PinballChatMessage[] = gameState?.chatMessages || [];
-  const isChatActive = status === 'waiting' || status === 'ready' || status === 'playing';
+  const chatMessages: PinballChatMessage[] = gameState?.chatMessages || []; // Using PinballChatMessage for now
   const userName = localStorage.getItem('ssafy_userName') || '익명';
   const isHost = gameState?.hostName === userName;
 
-  // 참가자 순서를 문자열로 변환 (배열 변경 감지용)
-  const participantsKey = gameState?.participants?.join(',') || '';
-
-  // Box2D 물리 엔진 초기화
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const initPhysics = async () => {
-      try {
-        console.log('PinballModal: 물리 엔진 초기화 시작');
-        const newPhysics = new Box2dPhysics();
-        await newPhysics.init();
-        physicsRef.current = newPhysics;
-        setPhysics(newPhysics);
-        setIsPhysicsReady(true);
-        console.log('PinballModal: 물리 엔진 초기화 완료');
-      } catch (error) {
-        console.error('PinballModal: 물리 엔진 초기화 실패', error);
-      }
-    };
-
-    initPhysics();
-
-    return () => {
-      if (physicsRef.current) {
-        physicsRef.current.reset();
-      }
-      setIsPhysicsReady(false);
-      setPhysics(null);
-      setStage(null);
-    };
-  }, [isOpen]);
-
-  // 게임 스테이지 및 공 설정
-  useEffect(() => {
-    if (!isPhysicsReady || !physics) return;
-    if (!gameState?.participants || gameState.participants.length === 0) return;
-
-    // 스테이지 생성
-    const newStage = createPinballStage(gameState.participants.length);
-    physics.reset();
-    physics.createStage(newStage);
-
-    // 공 생성
-    const spacing = (newStage.width - 2) / (gameState.participants.length + 1);
-    gameState.participants.forEach((name, index) => {
-      const x = 1 + spacing * (index + 1);
-      const y = newStage.startY;
-      physics.createMarble(index, x, y, name, getAvatarColor(name));
-    });
-
-    setStage(newStage);
-    setLocalFinished(false);
-    setIsPlaying(false);
-  }, [isPhysicsReady, physics, participantsKey, gameState?.seed]);
-
-  // playing 상태가 되면 게임 시작
-  useEffect(() => {
-    if (status === 'playing' && physics && isPhysicsReady) {
-      physics.start();
-      setIsPlaying(true);
-    }
-  }, [status, physics, isPhysicsReady]);
-
-  // 게임 시작 (호스트만 가능)
   const handleStartGame = async () => {
     if (!isHost) return;
     const groupRef = doc(db, 'groups', groupId);
     await updateDoc(groupRef, {
-      'pinballGame.status': 'ready',
+      'rouletteGame.status': 'ready',
     });
   };
 
-  // 시작 위치 셔플 (호스트만 가능)
   const handleShuffle = async () => {
     if (!isHost || !gameState?.participants) return;
 
@@ -124,12 +44,41 @@ const PinballModal = ({
 
     const groupRef = doc(db, 'groups', groupId);
     await updateDoc(groupRef, {
-      'pinballGame.participants': shuffled,
-      'pinballGame.seed': Date.now(),
+      'rouletteGame.participants': shuffled,
+      'rouletteGame.seed': Date.now(),
     });
   };
 
-  // 카운트다운 처리
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const initRoulette = async () => {
+      if (canvasRef.current) {
+        if (rouletteInstance.current) {
+          rouletteInstance.current.reset();
+        } else {
+          rouletteInstance.current = new Roulette(canvasRef.current);
+        }
+        
+        setIsRouletteReady(rouletteInstance.current.isReady);
+
+        if (rouletteInstance.current.isReady && gameState?.participants) {
+            rouletteInstance.current.setMarbles(gameState.participants);
+        }
+      }
+    };
+
+    initRoulette();
+
+    return () => {
+      if (rouletteInstance.current) {
+        rouletteInstance.current.reset();
+        rouletteInstance.current = null;
+      }
+    };
+  }, [isOpen, gameState?.participants, gameState?.seed]);
+
+
   useEffect(() => {
     if (status === 'ready') {
       setCountdown(3);
@@ -147,54 +96,61 @@ const PinballModal = ({
     }
   }, [status]);
 
-  // 카운트다운 완료 시 게임 시작
   useEffect(() => {
     if (status === 'ready' && countdown === 0) {
       const startGame = async () => {
         const groupRef = doc(db, 'groups', groupId);
         await updateDoc(groupRef, {
-          'pinballGame.status': 'playing',
+          'rouletteGame.status': 'playing',
         });
+        rouletteInstance.current?.start(); // Start the actual roulette game
       };
       startGame();
     }
   }, [status, countdown, groupId]);
 
-  // 모든 공 도착 시
-  const handleAllFinished = useCallback(async () => {
-    if (!physics || localFinished) return;
 
-    setIsPlaying(false);
-    setLocalFinished(true);
+  // Event listener for roulette 'goal' event
+  useEffect(() => {
+    const handleGoal = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const winnerName = customEvent.detail.winner;
+      
+      const updateRouletteState = async () => {
+        const groupRef = doc(db, 'groups', groupId);
+        await updateDoc(groupRef, {
+          'rouletteGame.status': 'finished',
+          'rouletteGame.winner': winnerName,
+          // finishOrder is not directly available from the current roulette.ts example
+          // 'rouletteGame.finishOrder': finishOrder, 
+        });
+      };
+      updateRouletteState();
+    };
 
-    const winner = physics.getWinner();
-    const finishOrder = physics.getFinishOrder();
-
-    if (winner) {
-      const groupRef = doc(db, 'groups', groupId);
-      await updateDoc(groupRef, {
-        'pinballGame.status': 'finished',
-        'pinballGame.winner': winner,
-        'pinballGame.finishOrder': finishOrder,
-      });
+    if (rouletteInstance.current) {
+      rouletteInstance.current.addEventListener('goal', handleGoal);
     }
-  }, [physics, groupId, localFinished]);
+
+    return () => {
+      if (rouletteInstance.current) {
+        rouletteInstance.current.removeEventListener('goal', handleGoal);
+      }
+    };
+  }, [groupId]);
+
 
   if (!isOpen) return null;
 
   return (
     <>
-      <div
-        className="fixed inset-0 bg-black/70 z-40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/70 z-40" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
         <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col pinball-modal-enter border border-gray-700">
-          {/* 헤더 */}
           <div className="flex justify-between items-center p-4 border-b border-gray-700 shrink-0">
             <h2 className="text-lg font-bold flex items-center gap-2 text-white">
-              <span className="text-2xl">🎱</span>
-              커피 내기 핀볼
+              <span className="text-2xl">🎡</span>
+              커피 내기 룰렛
             </h2>
             <button
               onClick={onClose}
@@ -203,37 +159,29 @@ const PinballModal = ({
               <X size={20} />
             </button>
           </div>
-
-          {/* 메인 컨텐츠 */}
           <div className="p-4 flex-1 flex gap-4 min-h-0">
             {/* 왼쪽: 게임 영역 */}
             <div className="overflow-y-auto custom-scrollbar shrink-0">
               <div className="flex flex-col items-center">
                 <div className="relative">
-                  {!isPhysicsReady ? (
-                    <div className="w-[300px] h-[400px] bg-gray-800 rounded-xl flex items-center justify-center">
+                  {!isRouletteReady ? (
+                    <div className="w-[800px] h-[600px] bg-gray-800 rounded-xl flex items-center justify-center">
                       <div className="text-center text-gray-400">
                         <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
-                        <p className="text-sm">물리 엔진 로딩 중...</p>
+                        <p className="text-sm">룰렛 로딩 중...</p>
                       </div>
                     </div>
                   ) : (
-                    <PinballCanvasBox2D
-                      physics={physics}
-                      stage={stage}
-                      isPlaying={isPlaying}
-                      onAllFinished={handleAllFinished}
-                    />
+                    <canvas ref={canvasRef} width="800" height="600"></canvas>
                   )}
-
-                  {/* 대기실 오버레이 */}
-                  {status === 'waiting' && isPhysicsReady && (
+                  
+                  {status === 'waiting' && isRouletteReady && (
                     <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center p-4">
                       <div className="bg-gray-800/95 rounded-2xl p-6 shadow-xl max-w-[280px] w-full border border-gray-600">
                         <div className="text-center mb-4">
                           <Users size={32} className="text-primary mx-auto mb-2" />
                           <h3 className="text-lg font-bold text-white">대기실</h3>
-                          <p className="text-xs text-gray-400">공 위치를 확인하세요!</p>
+                          <p className="text-xs text-gray-400">참가자들을 확인하세요!</p>
                         </div>
 
                         {/* 참가자 목록 */}
@@ -313,44 +261,42 @@ const PinballModal = ({
                 </div>
 
                 {/* 결과 표시 */}
-                {status === 'finished' && gameState?.winner && gameState?.finishOrder && (
-                  <div className="mt-4 w-full">
-                    <PinballResult
-                      winner={gameState.winner}
-                      finishOrder={gameState.finishOrder}
-                      onReset={onClose}
-                    />
+                {status === 'finished' && gameState?.winner && (
+                  <div className="mt-4 w-full text-center text-white">
+                    <h3 className="text-xl font-bold">🎉 승자: {gameState.winner} 🎉</h3>
+                    <button
+                      onClick={onClose}
+                      className="flex items-center justify-center gap-2 mx-auto px-4 py-2 mt-4 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
+                    >
+                      <RotateCcw size={16} />
+                      다시하기
+                    </button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* 오른쪽: 채팅 영역 */}
+            {/* 오른쪽: 채팅 영역 (임시) */}
             <div className="flex-1 flex flex-col min-w-[200px] min-h-0">
-              <PinballChat
-                groupId={groupId}
-                messages={chatMessages}
-                isActive={isChatActive}
-              />
+              <div className="flex-1 bg-gray-800 rounded-xl p-4 text-white">
+                <h3 className="font-bold mb-2">룰렛 채팅</h3>
+                {chatMessages.length === 0 ? (
+                  <p className="text-gray-400 text-sm">아직 메시지가 없어요.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {chatMessages.map((msg, index) => (
+                      <div key={index} className="text-sm">
+                        <span className="font-bold" style={{ color: getAvatarColor(msg.userName) }}>{msg.userName}:</span> {msg.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* 하단 버튼 */}
           <div className="p-4 border-t border-gray-700 text-center">
-            {status === 'waiting' && (
-              <button
-                onClick={onClose}
-                className="flex items-center justify-center gap-2 mx-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
-              >
-                <X size={16} />
-                대기실 나가기
-              </button>
-            )}
-            {status === 'playing' && (
-              <p className="text-gray-400 text-sm mb-4">
-                🎱 공이 떨어지고 있어요... 마지막에 도착하면 커피 당첨!
-              </p>
-            )}
             {(status === 'playing' || status === 'finished') && (
               <button
                 onClick={onClose}
@@ -367,4 +313,4 @@ const PinballModal = ({
   );
 };
 
-export default PinballModal;
+export default RouletteModal;
