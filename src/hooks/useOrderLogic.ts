@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
-import { GroupData, CartItem, Menu, OptionType, ToastMessage, OrderHistory, HistoryItem, PinballGameState } from '../types';
+import { GroupData, CartItem, Menu, OptionType, ToastMessage, OrderHistory, PinballGameState } from '../types';
 import { getAvatarColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
 
 // 애니메이션 타입
@@ -27,11 +27,11 @@ export const useOrderLogic = () => {
   const [totalPrice, setTotalPrice] = useState<number>(0);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
-  
-  // 모달 상태
+
+  // 모달 상태 (Race 관련 상태 삭제됨)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isPinballOpen, setIsPinballOpen] = useState(false);
-  const [isRaceOpen, setIsRaceOpen] = useState(false);
+
   const [history, setHistory] = useState<OrderHistory[]>([]);
   const [pinballGame, setPinballGame] = useState<PinballGameState | undefined>(undefined);
 
@@ -104,18 +104,17 @@ export const useOrderLogic = () => {
     }
   };
 
-  // 장바구니 추가 (애니메이션 포함)
+  // 장바구니 추가
   const addToCart = async (
-    e: React.MouseEvent | null, 
-    menuName: string, 
-    price: number, 
-    option: OptionType, 
-    categoryUpper: string, 
-    targetEl?: HTMLElement | null
+      e: React.MouseEvent | null,
+      menuName: string,
+      price: number,
+      option: OptionType,
+      categoryUpper: string,
+      targetEl?: HTMLElement | null
   ) => {
     if (!groupId) return;
 
-    // 1. 애니메이션
     if (e && targetEl) {
       const startX = e.clientX;
       const startY = e.clientY;
@@ -130,7 +129,6 @@ export const useOrderLogic = () => {
       setTimeout(() => setFlyingItems(prev => prev.filter(i => i.id !== animId)), 600);
     }
 
-    // 2. DB 업데이트
     const newItem: CartItem = {
       id: Date.now(),
       userName,
@@ -146,14 +144,13 @@ export const useOrderLogic = () => {
   const removeFromCart = async (menuName: string, option: OptionType) => {
     const targetItem = cart.find(item => item.menuName === menuName && item.option === option && item.userName === userName);
     if (!targetItem) return alert('내 메뉴만 취소 가능합니다.');
-    
+
     const newCart = cart.filter(item => item.id !== targetItem.id);
     await updateDoc(doc(db, 'groups', groupId!), { cart: newCart });
   };
 
   const clearCart = async () => {
     if (!confirm('정말 비우시겠습니까?')) return;
-    // 히스토리 생성 로직 생략 (간소화 위해, 필요시 기존 코드 복사)
     await updateDoc(doc(db, 'groups', groupId!), { cart: [] });
     addToast('장바구니가 비워졌습니다.', 'success');
   };
@@ -166,7 +163,6 @@ export const useOrderLogic = () => {
     // Modals
     isHistoryOpen, setIsHistoryOpen,
     isPinballOpen, setIsPinballOpen,
-    isRaceOpen, setIsRaceOpen,
     // Actions
     setSelectedCategory, setSelectedSubCategory,
     addToast, removeToast, toggleFavorite,
