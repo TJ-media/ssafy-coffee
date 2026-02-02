@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { MEGA_MENUS, CATEGORIES } from '../menuData';
-import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History, Target } from 'lucide-react';
+import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History, Target, PenLine } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory } from '../types';
 import { getAvatarColor, getTextContrastColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
@@ -37,7 +37,11 @@ const OrderPage = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [history, setHistory] = useState<OrderHistory[]>([]);
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
-  
+
+  // 직접 입력 메뉴 상태
+  const [customMenuName, setCustomMenuName] = useState<string>('');
+  const [customMenuPrice, setCustomMenuPrice] = useState<string>('');
+
   // 룰렛 관련 상태
   const [rouletteGame, setRouletteGame] = useState<RouletteGameState | undefined>(undefined);
   const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
@@ -247,6 +251,36 @@ const OrderPage = () => {
     };
     const groupRef = doc(db, 'groups', groupId);
     await updateDoc(groupRef, { cart: arrayUnion(newItem) });
+  };
+
+  // 직접 입력 메뉴 추가
+  const addCustomMenu = async (option: OptionType) => {
+    if (!groupId || !userName) return;
+    if (!customMenuName.trim()) {
+      addToast('메뉴 이름을 입력해주세요', 'warning');
+      return;
+    }
+    const price = parseInt(customMenuPrice) || 0;
+    if (price <= 0) {
+      addToast('가격을 입력해주세요', 'warning');
+      return;
+    }
+
+    const newItem: CartItem = {
+      id: Date.now(),
+      userName: userName,
+      menuName: customMenuName.trim(),
+      price: price,
+      option: option,
+      category: '직접입력'
+    };
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, { cart: arrayUnion(newItem) });
+
+    // 입력 필드 초기화
+    setCustomMenuName('');
+    setCustomMenuPrice('');
+    addToast(`${customMenuName} 추가됨!`, 'success');
   };
 
   const removeFromCart = async (menuName: string, option: OptionType) => {
@@ -481,6 +515,50 @@ const OrderPage = () => {
            </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
+            {/* 직접 입력 카드 */}
+            <div className="bg-surface p-4 rounded-2xl shadow-toss flex flex-col items-center col-span-2">
+              <div className="flex items-center gap-2 mb-3 text-primary">
+                <PenLine size={20} />
+                <span className="font-bold">직접 입력</span>
+              </div>
+              <div className="w-full space-y-2 mb-3">
+                <input
+                  type="text"
+                  placeholder="메뉴 이름"
+                  value={customMenuName}
+                  onChange={(e) => setCustomMenuName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                />
+                <input
+                  type="number"
+                  placeholder="가격 (원)"
+                  value={customMenuPrice}
+                  onChange={(e) => setCustomMenuPrice(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div className="flex w-full gap-2">
+                <button
+                  onClick={() => addCustomMenu('ICE')}
+                  className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-xl text-xs font-bold hover:bg-blue-100 transition active:scale-95"
+                >
+                  ICE
+                </button>
+                <button
+                  onClick={() => addCustomMenu('HOT')}
+                  className="flex-1 bg-red-50 text-red-600 py-2 rounded-xl text-xs font-bold hover:bg-red-100 transition active:scale-95"
+                >
+                  HOT
+                </button>
+                <button
+                  onClick={() => addCustomMenu('ONLY')}
+                  className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 transition active:scale-95"
+                >
+                  기타
+                </button>
+              </div>
+            </div>
+
             {/* 메뉴 필터링 및 매핑 */}
             {currentMenus
               .filter(m => selectedCategory === '즐겨찾기' || selectedSubCategory === '전체' || m.categoryLower === selectedSubCategory)
