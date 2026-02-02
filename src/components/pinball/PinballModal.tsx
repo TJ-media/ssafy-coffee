@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { X, Play, Users } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { X, RotateCcw, Play, Users, Shuffle } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { PinballGameState } from '../../types';
-import { PinballPhysics } from '../../utils/pinballPhysics';
-import { getAvatarColor } from '../../utils';
-import PinballCanvas from './PinballCanvas';
+import { PinballGameState, PinballChatMessage } from '../../types';
+import { Box2dPhysics } from '../../utils/pinball/Box2dPhysics';
+import { createPinballStage } from '../../utils/pinball/maps';
+import { StageDef } from '../../utils/pinball/types';
+import { getAvatarColor, getTextContrastColor } from '../../utils';
+import PinballCanvasBox2D from './PinballCanvasBox2D';
 import PinballResult from './PinballResult';
+import PinballChat from './PinballChat';
 
 interface PinballModalProps {
   isOpen: boolean;
@@ -16,51 +19,115 @@ interface PinballModalProps {
   gameState: PinballGameState | undefined;
 }
 
-const CANVAS_WIDTH = 300;
-const CANVAS_HEIGHT = 450;
-
 const PinballModal = ({
   isOpen,
   onClose,
   groupId,
-  participants,
   gameState,
 }: PinballModalProps) => {
-  const [physics, setPhysics] = useState<PinballPhysics | null>(null);
+  const [physics, setPhysics] = useState<Box2dPhysics | null>(null);
+  const [stage, setStage] = useState<StageDef | null>(null);
   const [countdown, setCountdown] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [localFinished, setLocalFinished] = useState(false);
+  const [isPhysicsReady, setIsPhysicsReady] = useState(false);
+  const physicsRef = useRef<Box2dPhysics | null>(null);
 
   const status = gameState?.status || 'idle';
+  const chatMessages: PinballChatMessage[] = gameState?.chatMessages || [];
+  const isChatActive = status === 'waiting' || status === 'ready' || status === 'playing';
+  const userName = localStorage.getItem('ssafy_userName') || '익명';
+  const isHost = gameState?.hostName === userName;
 
-  // 게임 상태에 따라 물리 엔진 초기화
+  // 참가자 순서를 문자열로 변환 (배열 변경 감지용)
+  const participantsKey = gameState?.participants?.join(',') || '';
+
+  // Box2D 물리 엔진 초기화
   useEffect(() => {
     if (!isOpen) return;
 
-    if (status === 'playing' || status === 'finished') {
-      if (gameState?.seed && gameState?.participants) {
-        const newPhysics = new PinballPhysics(
-          CANVAS_WIDTH,
-          CANVAS_HEIGHT,
-          gameState.seed
-        );
-        newPhysics.addParticipants(gameState.participants, getAvatarColor);
-
-        // 이미 끝난 게임이면 빠르게 진행
-        if (status === 'finished') {
-          newPhysics.fastForward();
-          setLocalFinished(true);
-        }
-
+    const initPhysics = async () => {
+      try {
+        console.log('PinballModal: 물리 엔진 초기화 시작');
+        const newPhysics = new Box2dPhysics();
+        await newPhysics.init();
+        physicsRef.current = newPhysics;
         setPhysics(newPhysics);
-        setIsPlaying(status === 'playing');
+        setIsPhysicsReady(true);
+        console.log('PinballModal: 물리 엔진 초기화 완료');
+      } catch (error) {
+        console.error('PinballModal: 물리 엔진 초기화 실패', error);
       }
-    } else {
+    };
+
+    initPhysics();
+
+    return () => {
+      if (physicsRef.current) {
+        physicsRef.current.reset();
+      }
+      setIsPhysicsReady(false);
       setPhysics(null);
-      setIsPlaying(false);
-      setLocalFinished(false);
+      setStage(null);
+    };
+  }, [isOpen]);
+
+  // 게임 스테이지 및 공 설정
+  useEffect(() => {
+    if (!isPhysicsReady || !physics) return;
+    if (!gameState?.participants || gameState.participants.length === 0) return;
+
+    // 스테이지 생성
+    const newStage = createPinballStage(gameState.participants.length);
+    physics.reset();
+    physics.createStage(newStage);
+
+    // 공 생성
+    const spacing = (newStage.width - 2) / (gameState.participants.length + 1);
+    gameState.participants.forEach((name, index) => {
+      const x = 1 + spacing * (index + 1);
+      const y = newStage.startY;
+      physics.createMarble(index, x, y, name, getAvatarColor(name));
+    });
+
+    setStage(newStage);
+    setLocalFinished(false);
+    setIsPlaying(false);
+  }, [isPhysicsReady, physics, participantsKey, gameState?.seed]);
+
+  // playing 상태가 되면 게임 시작
+  useEffect(() => {
+    if (status === 'playing' && physics && isPhysicsReady) {
+      physics.start();
+      setIsPlaying(true);
     }
-  }, [isOpen, status, gameState?.seed, gameState?.participants]);
+  }, [status, physics, isPhysicsReady]);
+
+  // 게임 시작 (호스트만 가능)
+  const handleStartGame = async () => {
+    if (!isHost) return;
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      'pinballGame.status': 'ready',
+    });
+  };
+
+  // 시작 위치 셔플 (호스트만 가능)
+  const handleShuffle = async () => {
+    if (!isHost || !gameState?.participants) return;
+
+    const shuffled = [...gameState.participants];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      'pinballGame.participants': shuffled,
+      'pinballGame.seed': Date.now(),
+    });
+  };
 
   // 카운트다운 처리
   useEffect(() => {
@@ -83,7 +150,6 @@ const PinballModal = ({
   // 카운트다운 완료 시 게임 시작
   useEffect(() => {
     if (status === 'ready' && countdown === 0) {
-      // 첫 번째 클라이언트만 상태 업데이트
       const startGame = async () => {
         const groupRef = doc(db, 'groups', groupId);
         await updateDoc(groupRef, {
@@ -93,28 +159,6 @@ const PinballModal = ({
       startGame();
     }
   }, [status, countdown, groupId]);
-
-  // 게임 시작 버튼
-  const handleStartGame = async () => {
-    if (participants.length < 2) {
-      alert('2명 이상의 참여자가 필요합니다.');
-      return;
-    }
-
-    const seed = Date.now();
-    const groupRef = doc(db, 'groups', groupId);
-
-    const newGameState: PinballGameState = {
-      status: 'ready',
-      participants: participants,
-      seed: seed,
-      startedAt: new Date(),
-    };
-
-    await updateDoc(groupRef, {
-      pinballGame: newGameState,
-    });
-  };
 
   // 모든 공 도착 시
   const handleAllFinished = useCallback(async () => {
@@ -136,141 +180,187 @@ const PinballModal = ({
     }
   }, [physics, groupId, localFinished]);
 
-  // 리셋
-  const handleReset = async () => {
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, {
-      pinballGame: {
-        status: 'idle',
-        participants: [],
-        seed: 0,
-      },
-    });
-    setPhysics(null);
-    setLocalFinished(false);
-  };
-
   if (!isOpen) return null;
 
   return (
     <>
-      {/* 백드롭 */}
       <div
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 bg-black/70 z-40"
         onClick={onClose}
       />
-
-      {/* 모달 */}
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full max-h-[90vh] overflow-hidden pinball-modal-enter">
+        <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col pinball-modal-enter border border-gray-700">
           {/* 헤더 */}
-          <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="text-lg font-bold flex items-center gap-2">
+          <div className="flex justify-between items-center p-4 border-b border-gray-700 shrink-0">
+            <h2 className="text-lg font-bold flex items-center gap-2 text-white">
               <span className="text-2xl">🎱</span>
               커피 내기 핀볼
             </h2>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-full transition"
+              className="p-1 hover:bg-gray-700 rounded-full transition text-gray-400 hover:text-white"
             >
               <X size={20} />
             </button>
           </div>
 
-          {/* 컨텐츠 */}
-          <div className="p-4 overflow-y-auto max-h-[calc(90vh-140px)]">
-            {/* 참여자 표시 */}
-            {status === 'idle' && (
-              <div className="mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                  <Users size={16} />
-                  <span>참여자 ({participants.length}명)</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {participants.map((name) => (
-                    <div
-                      key={name}
-                      className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-full"
-                    >
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
-                        style={{ backgroundColor: getAvatarColor(name) }}
-                      >
-                        {name.slice(0, 1)}
+          {/* 메인 컨텐츠 */}
+          <div className="p-4 flex-1 flex gap-4 min-h-0">
+            {/* 왼쪽: 게임 영역 */}
+            <div className="overflow-y-auto custom-scrollbar shrink-0">
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  {!isPhysicsReady ? (
+                    <div className="w-[300px] h-[400px] bg-gray-800 rounded-xl flex items-center justify-center">
+                      <div className="text-center text-gray-400">
+                        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
+                        <p className="text-sm">물리 엔진 로딩 중...</p>
                       </div>
-                      <span className="text-sm">{name}</span>
                     </div>
-                  ))}
+                  ) : (
+                    <PinballCanvasBox2D
+                      physics={physics}
+                      stage={stage}
+                      isPlaying={isPlaying}
+                      onAllFinished={handleAllFinished}
+                    />
+                  )}
+
+                  {/* 대기실 오버레이 */}
+                  {status === 'waiting' && isPhysicsReady && (
+                    <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center p-4">
+                      <div className="bg-gray-800/95 rounded-2xl p-6 shadow-xl max-w-[280px] w-full border border-gray-600">
+                        <div className="text-center mb-4">
+                          <Users size={32} className="text-primary mx-auto mb-2" />
+                          <h3 className="text-lg font-bold text-white">대기실</h3>
+                          <p className="text-xs text-gray-400">공 위치를 확인하세요!</p>
+                        </div>
+
+                        {/* 참가자 목록 */}
+                        <div className="bg-gray-700/50 rounded-xl p-3 mb-4">
+                          <p className="text-xs text-gray-400 mb-2 font-bold">
+                            참가자 ({gameState?.participants?.length || 0}명)
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 justify-center">
+                            {gameState?.participants?.map((name) => (
+                              <div
+                                key={name}
+                                className="flex items-center gap-1.5 px-2 py-1 bg-gray-600 rounded-full"
+                              >
+                                <div
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
+                                  style={{
+                                    backgroundColor: getAvatarColor(name),
+                                    color: getTextContrastColor(),
+                                  }}
+                                >
+                                  {name.slice(0, 1)}
+                                </div>
+                                <span className="text-xs font-medium text-gray-200">
+                                  {name}
+                                  {name === gameState?.hostName && (
+                                    <span className="ml-0.5 text-[10px] text-primary">(방장)</span>
+                                  )}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 시작/셔플 버튼 */}
+                        {isHost ? (
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={handleStartGame}
+                              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition shadow-md"
+                            >
+                              <Play size={18} />
+                              게임 시작!
+                            </button>
+                            <button
+                              onClick={handleShuffle}
+                              className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-gray-600 text-gray-200 rounded-xl font-medium hover:bg-gray-500 transition text-sm"
+                            >
+                              <Shuffle size={14} />
+                              위치 셔플
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-center">
+                            <p className="text-xs text-gray-400">
+                              <span className="font-bold text-primary">{gameState?.hostName}</span>님이
+                              시작하면 게임이 시작돼요
+                            </p>
+                            <div className="mt-2 flex items-center justify-center gap-1">
+                              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 카운트다운 오버레이 */}
+                  {status === 'ready' && countdown > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+                      <span className="text-8xl font-bold text-white countdown-pop drop-shadow-lg">
+                        {countdown}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                {participants.length === 0 && (
-                  <p className="text-gray-400 text-sm py-4 text-center">
-                    장바구니에 메뉴를 담은 사람이 없어요
-                  </p>
-                )}
-                {participants.length === 1 && (
-                  <p className="text-amber-500 text-sm py-2 text-center">
-                    2명 이상 필요합니다
-                  </p>
-                )}
-              </div>
-            )}
 
-            {/* 캔버스 영역 */}
-            {(status === 'playing' || status === 'finished' || status === 'ready') && (
-              <div className="flex justify-center mb-4 relative">
-                <PinballCanvas
-                  physics={physics}
-                  isPlaying={isPlaying}
-                  onAllFinished={handleAllFinished}
-                />
-
-                {/* 카운트다운 오버레이 */}
-                {status === 'ready' && countdown > 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl">
-                    <span className="text-7xl font-bold text-white countdown-pop">
-                      {countdown}
-                    </span>
+                {/* 결과 표시 */}
+                {status === 'finished' && gameState?.winner && gameState?.finishOrder && (
+                  <div className="mt-4 w-full">
+                    <PinballResult
+                      winner={gameState.winner}
+                      finishOrder={gameState.finishOrder}
+                      onReset={onClose}
+                    />
                   </div>
                 )}
               </div>
-            )}
+            </div>
 
-            {/* 결과 화면 */}
-            {status === 'finished' && gameState?.winner && gameState?.finishOrder && (
-              <PinballResult
-                winner={gameState.winner}
-                finishOrder={gameState.finishOrder}
-                onReset={handleReset}
+            {/* 오른쪽: 채팅 영역 */}
+            <div className="flex-1 flex flex-col min-w-[200px] min-h-0">
+              <PinballChat
+                groupId={groupId}
+                messages={chatMessages}
+                isActive={isChatActive}
               />
-            )}
+            </div>
           </div>
 
-          {/* 푸터 - 시작 버튼 */}
-          {status === 'idle' && (
-            <div className="p-4 border-t">
+          {/* 하단 버튼 */}
+          <div className="p-4 border-t border-gray-700 text-center">
+            {status === 'waiting' && (
               <button
-                onClick={handleStartGame}
-                disabled={participants.length < 2}
-                className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition ${
-                  participants.length >= 2
-                    ? 'bg-primary text-white hover:bg-primary-dark'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 mx-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
               >
-                <Play size={20} />
-                마감하고 게임 시작
+                <X size={16} />
+                대기실 나가기
               </button>
-            </div>
-          )}
-
-          {/* 게임 중 안내 */}
-          {status === 'playing' && (
-            <div className="p-4 border-t text-center">
-              <p className="text-gray-500 text-sm">
+            )}
+            {status === 'playing' && (
+              <p className="text-gray-400 text-sm mb-4">
                 🎱 공이 떨어지고 있어요... 마지막에 도착하면 커피 당첨!
               </p>
-            </div>
-          )}
+            )}
+            {(status === 'playing' || status === 'finished') && (
+              <button
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 mx-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
+              >
+                <RotateCcw size={16} />
+                처음부터 다시하기
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </>
