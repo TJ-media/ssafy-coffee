@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import OrderPage from './pages/OrderPage';
+import AdminPage from './pages/AdminPage';
 import './index.css';
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/order" element={<OrderPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </div>
       </div>
