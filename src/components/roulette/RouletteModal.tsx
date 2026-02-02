@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, RotateCcw, Play, Users, Shuffle } from 'lucide-react';
-import { RouletteGameState, PinballChatMessage } from '../../types';
+import { X, Play, Users, Shuffle, Monitor } from 'lucide-react';
+import { RouletteGameState, CartItem, GroupedCartItem, HistoryItem, RouletteHistory } from '../../types';
 import { Roulette } from './roulette';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getAvatarColor, getTextContrastColor } from '../../utils';
-import RouletteChat from './RouletteChat';
 import RouletteResult from './RouletteResult';
 
 interface RouletteModalProps {
@@ -14,9 +13,55 @@ interface RouletteModalProps {
   groupId: string;
   participants: string[];
   gameState: RouletteGameState | undefined;
+  cart?: CartItem[]; // 장바구니 데이터
+  marbleCounts?: { [userName: string]: number }; // 사용자별 공 개수
 }
 
-const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId, gameState }) => {
+// 장바구니를 그룹화하는 함수
+const groupCartItems = (cart: CartItem[]): GroupedCartItem[] => {
+  const grouped: { [key: string]: GroupedCartItem } = {};
+
+  cart.forEach((item) => {
+    const key = `${item.menuName}-${item.option}`;
+    if (grouped[key]) {
+      grouped[key].count += 1;
+      if (!grouped[key].names.includes(item.userName)) {
+        grouped[key].names.push(item.userName);
+      }
+    } else {
+      grouped[key] = {
+        menuName: item.menuName,
+        option: item.option,
+        price: item.price,
+        count: 1,
+        names: [item.userName],
+      };
+    }
+  });
+
+  return Object.values(grouped);
+};
+
+// 히스토리용 아이템 변환
+const cartToHistoryItems = (cart: CartItem[]): HistoryItem[] => {
+  const grouped = groupCartItems(cart);
+  return grouped.map((item) => ({
+    menuName: item.menuName,
+    option: item.option,
+    price: item.price,
+    count: item.count,
+    orderedBy: item.names,
+  }));
+};
+
+const RouletteModal: React.FC<RouletteModalProps> = ({
+  isOpen,
+  onClose,
+  groupId,
+  gameState,
+  cart = [],
+  marbleCounts = {}
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rouletteInstance = useRef<Roulette | null>(null);
 
@@ -24,15 +69,48 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
   const [countdown, setCountdown] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [localFinished, setLocalFinished] = useState(false);
+  const [historySaved, setHistorySaved] = useState(false);
+
+  // 장바구니 캐시 (게임 시작 시 저장, 결과 화면에서 사용)
+  const [cachedCart, setCachedCart] = useState<CartItem[]>([]);
 
   const status = gameState?.status || 'idle';
-  const chatMessages: PinballChatMessage[] = gameState?.chatMessages || [];
-  const isChatActive = status === 'waiting' || status === 'ready' || status === 'playing';
   const userName = localStorage.getItem('ssafy_userName') || '익명';
   const isHost = gameState?.hostName === userName;
+  const isWinner = gameState?.winner === userName;
 
   // 참가자 순서를 문자열로 변환 (배열 변경 감지용)
   const participantsKey = gameState?.participants?.join(',') || '';
+
+  // 게임 시작 시 장바구니 캐시 (장바구니가 비워져도 결과 화면에서 사용)
+  useEffect(() => {
+    if (status === 'waiting' && cart.length > 0) {
+      setCachedCart(cart);
+    }
+  }, [status, cart]);
+
+  // 캐시된 장바구니로 계산 (결과 화면용)
+  const displayCart = cachedCart.length > 0 ? cachedCart : cart;
+  const groupedCart = groupCartItems(displayCart);
+  const totalPrice = displayCart.reduce((sum, item) => sum + item.price, 0);
+
+  // 참가자별 공 개수에 따라 마블 배열 확장
+  // 예: A가 2개, B가 1개면 ["A", "A", "B"]
+  const expandParticipants = (participants: string[], counts: { [name: string]: number }): string[] => {
+    const expanded: string[] = [];
+    participants.forEach(name => {
+      const count = counts[name] || 1; // 기본값 1개
+      for (let i = 0; i < count; i++) {
+        expanded.push(name);
+      }
+    });
+    return expanded;
+  };
+
+  // 현재 참가자들의 공 개수 계산 (UI 표시용)
+  const getParticipantMarbleCount = (name: string): number => {
+    return marbleCounts[name] || 1;
+  };
 
   const handleStartGame = async () => {
     if (!isHost) return;
@@ -58,9 +136,49 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
     });
   };
 
-  // 룰렛 초기화
+  // 룰렛 히스토리 저장 + 장바구니 비우기 + 공 개수 업데이트
+  const saveRouletteHistory = async (winnerName: string) => {
+    if (historySaved || cachedCart.length === 0) return;
+
+    const participants = gameState?.participants || [];
+
+    const historyItem: RouletteHistory = {
+      id: `roulette_${Date.now()}`,
+      playedAt: new Date(),
+      winner: winnerName,
+      participants: participants,
+      orderItems: cartToHistoryItems(cachedCart),
+      totalPrice: cachedCart.reduce((sum, item) => sum + item.price, 0),
+    };
+
+    // 공 개수 업데이트: 참가자는 +1, 당첨자는 1로 초기화
+    const newMarbleCounts = { ...marbleCounts };
+    participants.forEach(name => {
+      if (name === winnerName) {
+        // 당첨자(패배자)는 1로 초기화
+        newMarbleCounts[name] = 1;
+      } else {
+        // 비당첨자는 +1 (다음 게임에서 확률 증가)
+        newMarbleCounts[name] = (newMarbleCounts[name] || 1) + 1;
+      }
+    });
+
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        rouletteHistory: arrayUnion(historyItem),
+        cart: [], // 장바구니 비우기
+        marbleCounts: newMarbleCounts, // 공 개수 업데이트
+      });
+      setHistorySaved(true);
+    } catch (e) {
+      console.error('Failed to save roulette history:', e);
+    }
+  };
+
+  // 룰렛 초기화 (호스트만)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isHost) return;
 
     const initRoulette = async () => {
       if (canvasRef.current) {
@@ -70,12 +188,12 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
           rouletteInstance.current = new Roulette(canvasRef.current);
         }
 
-        // 잠시 대기 후 ready 상태 확인
         const checkReady = () => {
           if (rouletteInstance.current?.isReady) {
             setIsRouletteReady(true);
             if (gameState?.participants) {
-              rouletteInstance.current.setMarbles(gameState.participants);
+              const expanded = expandParticipants(gameState.participants, marbleCounts);
+              rouletteInstance.current.setMarbles(expanded, gameState.seed);
             }
           } else {
             setTimeout(checkReady, 100);
@@ -88,6 +206,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
     initRoulette();
     setLocalFinished(false);
     setIsPlaying(false);
+    setHistorySaved(false);
 
     return () => {
       if (rouletteInstance.current) {
@@ -95,19 +214,21 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
         rouletteInstance.current = null;
       }
       setIsRouletteReady(false);
+      setCachedCart([]); // 캐시 초기화
     };
-  }, [isOpen]);
+  }, [isOpen, isHost]);
 
-  // 참가자 변경시 마블 재설정
+  // 참가자 변경시 마블 재설정 (호스트만)
   useEffect(() => {
-    if (!isRouletteReady || !rouletteInstance.current) return;
+    if (!isHost || !isRouletteReady || !rouletteInstance.current) return;
     if (!gameState?.participants || gameState.participants.length === 0) return;
 
     rouletteInstance.current.reset();
-    rouletteInstance.current.setMarbles(gameState.participants);
+    const expanded = expandParticipants(gameState.participants, marbleCounts);
+    rouletteInstance.current.setMarbles(expanded, gameState.seed);
     setLocalFinished(false);
     setIsPlaying(false);
-  }, [isRouletteReady, participantsKey, gameState?.seed]);
+  }, [isHost, isRouletteReady, participantsKey, gameState?.seed, marbleCounts]);
 
   // 카운트다운 처리
   useEffect(() => {
@@ -127,9 +248,9 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
     }
   }, [status]);
 
-  // 카운트다운 완료 시 게임 시작
+  // 카운트다운 완료 시 게임 시작 (호스트만)
   useEffect(() => {
-    if (status === 'ready' && countdown === 0) {
+    if (status === 'ready' && countdown === 0 && isHost) {
       const startGame = async () => {
         const groupRef = doc(db, 'groups', groupId);
         await updateDoc(groupRef, {
@@ -138,18 +259,26 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
       };
       startGame();
     }
-  }, [status, countdown, groupId]);
+  }, [status, countdown, groupId, isHost]);
 
-  // playing 상태가 되면 게임 시작
+  // playing 상태가 되면 게임 시작 (호스트만)
   useEffect(() => {
-    if (status === 'playing' && rouletteInstance.current && isRouletteReady) {
+    if (status === 'playing' && isHost && rouletteInstance.current && isRouletteReady) {
+      const participants = gameState?.participants || [];
+      const expanded = expandParticipants(participants, marbleCounts);
+      if (expanded.length > 0) {
+        // 마지막 공이 당첨(패배)
+        rouletteInstance.current.setWinningRank(expanded.length - 1);
+      }
       rouletteInstance.current.start();
       setIsPlaying(true);
     }
-  }, [status, isRouletteReady]);
+  }, [status, isRouletteReady, isHost, marbleCounts]);
 
-  // Event listener for roulette 'goal' event
+  // Event listener for roulette 'goal' event (호스트만)
   useEffect(() => {
+    if (!isHost) return;
+
     const handleGoal = (event: Event) => {
       if (localFinished) return;
 
@@ -165,6 +294,8 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
           'rouletteGame.status': 'finished',
           'rouletteGame.winner': winnerName,
         });
+        // 히스토리 저장
+        await saveRouletteHistory(winnerName);
       };
       updateRouletteState();
     };
@@ -178,9 +309,87 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
         rouletteInstance.current.removeEventListener('goal', handleGoal);
       }
     };
-  }, [groupId, localFinished]);
+  }, [groupId, localFinished, isHost, cart, historySaved]);
 
   if (!isOpen) return null;
+
+  // 비호스트: 게임 시작 시 방장 화면 보라는 안내
+  if (!isHost && (status === 'ready' || status === 'playing')) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black/80 z-40" onClick={onClose} />
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-8 text-center border border-gray-700 pinball-modal-enter">
+            <div className="mb-6">
+              <Monitor size={64} className="text-primary mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">
+                🎡 룰렛이 시작됐어요!
+              </h2>
+              <p className="text-gray-400">
+                <span className="text-primary font-bold">{gameState?.hostName}</span>님의 화면으로 모여주세요
+              </p>
+            </div>
+
+            <div className="bg-gray-800 rounded-xl p-4 mb-6">
+              <p className="text-sm text-gray-300 mb-2">참가자</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {gameState?.participants?.map((name) => (
+                  <div
+                    key={name}
+                    className="flex items-center gap-1.5 px-2 py-1 bg-gray-700 rounded-full"
+                  >
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
+                      style={{
+                        backgroundColor: getAvatarColor(name),
+                        color: getTextContrastColor(),
+                      }}
+                    >
+                      {name.slice(0, 1)}
+                    </div>
+                    <span className="text-xs font-medium text-gray-200">{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 text-gray-400 mb-6">
+              <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+              <span className="text-sm">게임 진행 중...</span>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // 게임 종료 - 결과 화면 (모든 사용자)
+  if (status === 'finished' && gameState?.winner) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black/80 z-40" onClick={onClose} />
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-gray-700 pinball-modal-enter max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <RouletteResult
+              winner={gameState.winner}
+              finishOrder={gameState.finishOrder}
+              onReset={onClose}
+              isWinner={isWinner}
+              orderItems={groupedCart}
+              totalPrice={totalPrice}
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -205,43 +414,45 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
           </div>
 
           {/* 메인 컨텐츠 */}
-          <div className="flex-1 flex gap-2 p-2 min-h-0 overflow-hidden">
-            {/* 왼쪽: 게임 영역 (전체 채움) */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="flex-1 relative">
-                {/* Canvas는 항상 렌더링 */}
+          <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden">
+            <div className="flex-1 relative">
+              {/* Canvas (호스트만) */}
+              {isHost && (
                 <canvas
                   ref={canvasRef}
                   className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}
                 ></canvas>
+              )}
 
-                {/* 로딩 화면 */}
-                {!isRouletteReady && (
-                  <div className="absolute inset-0 bg-gray-800 rounded-xl flex items-center justify-center">
-                    <div className="text-center text-gray-400">
-                      <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-                      <p className="text-lg">룰렛 로딩 중...</p>
-                    </div>
+              {/* 로딩 화면 (호스트만) */}
+              {isHost && !isRouletteReady && (
+                <div className="absolute inset-0 bg-gray-800 rounded-xl flex items-center justify-center">
+                  <div className="text-center text-gray-400">
+                    <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+                    <p className="text-lg">룰렛 로딩 중...</p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* 대기실 오버레이 */}
-                {status === 'waiting' && isRouletteReady && (
-                  <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center p-4">
-                    <div className="bg-gray-800/95 rounded-2xl p-6 shadow-xl max-w-[320px] w-full border border-gray-600">
-                      <div className="text-center mb-4">
-                        <Users size={40} className="text-primary mx-auto mb-2" />
-                        <h3 className="text-xl font-bold text-white">대기실</h3>
-                        <p className="text-sm text-gray-400">참가자들을 확인하세요!</p>
-                      </div>
+              {/* 대기실 오버레이 */}
+              {status === 'waiting' && (isHost ? isRouletteReady : true) && (
+                <div className={`${isHost ? 'absolute' : ''} inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center p-4 h-full`}>
+                  <div className="bg-gray-800/95 rounded-2xl p-6 shadow-xl max-w-[320px] w-full border border-gray-600">
+                    <div className="text-center mb-4">
+                      <Users size={40} className="text-primary mx-auto mb-2" />
+                      <h3 className="text-xl font-bold text-white">대기실</h3>
+                      <p className="text-sm text-gray-400">참가자들을 확인하세요!</p>
+                    </div>
 
-                      {/* 참가자 목록 */}
-                      <div className="bg-gray-700/50 rounded-xl p-3 mb-4">
-                        <p className="text-xs text-gray-400 mb-2 font-bold">
-                          참가자 ({gameState?.participants?.length || 0}명)
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 justify-center">
-                          {gameState?.participants?.map((name) => (
+                    {/* 참가자 목록 */}
+                    <div className="bg-gray-700/50 rounded-xl p-3 mb-4">
+                      <p className="text-xs text-gray-400 mb-2 font-bold">
+                        참가자 ({gameState?.participants?.length || 0}명) · 🎱 = 당첨 확률
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 justify-center">
+                        {gameState?.participants?.map((name) => {
+                          const marbleCount = getParticipantMarbleCount(name);
+                          return (
                             <div
                               key={name}
                               className="flex items-center gap-1.5 px-2 py-1 bg-gray-600 rounded-full"
@@ -261,102 +472,78 @@ const RouletteModal: React.FC<RouletteModalProps> = ({ isOpen, onClose, groupId,
                                   <span className="ml-0.5 text-[10px] text-primary">(방장)</span>
                                 )}
                               </span>
+                              {marbleCount > 1 && (
+                                <span className="text-[10px] bg-amber-500/30 text-amber-300 px-1 rounded font-bold">
+                                  🎱x{marbleCount}
+                                </span>
+                              )}
                             </div>
-                          ))}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 시작/셔플 버튼 */}
+                    {isHost ? (
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={handleStartGame}
+                          className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition shadow-md text-lg"
+                        >
+                          <Play size={20} />
+                          게임 시작!
+                        </button>
+                        <button
+                          onClick={handleShuffle}
+                          className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-gray-600 text-gray-200 rounded-xl font-medium hover:bg-gray-500 transition text-sm"
+                        >
+                          <Shuffle size={14} />
+                          위치 셔플
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <p className="text-sm text-gray-400">
+                          <span className="font-bold text-primary">{gameState?.hostName}</span>님이
+                          시작하면 게임이 시작돼요
+                        </p>
+                        <div className="mt-2 flex items-center justify-center gap-1">
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                       </div>
-
-                      {/* 시작/셔플 버튼 */}
-                      {isHost ? (
-                        <div className="flex flex-col gap-2">
-                          <button
-                            onClick={handleStartGame}
-                            className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition shadow-md text-lg"
-                          >
-                            <Play size={20} />
-                            게임 시작!
-                          </button>
-                          <button
-                            onClick={handleShuffle}
-                            className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-gray-600 text-gray-200 rounded-xl font-medium hover:bg-gray-500 transition text-sm"
-                          >
-                            <Shuffle size={14} />
-                            위치 셔플
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="text-center">
-                          <p className="text-sm text-gray-400">
-                            <span className="font-bold text-primary">{gameState?.hostName}</span>님이
-                            시작하면 게임이 시작돼요
-                          </p>
-                          <div className="mt-2 flex items-center justify-center gap-1">
-                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* 카운트다운 오버레이 */}
-                {status === 'ready' && countdown > 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
-                    <span className="text-[120px] font-bold text-white countdown-pop drop-shadow-lg">
-                      {countdown}
-                    </span>
-                  </div>
-                )}
-
-                {/* 결과 표시 */}
-                {status === 'finished' && gameState?.winner && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-xl">
-                    <RouletteResult
-                      winner={gameState.winner}
-                      finishOrder={gameState.finishOrder}
-                      onReset={onClose}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* 하단 상태 */}
-              <div className="py-2 text-center shrink-0">
-                {status === 'waiting' && (
-                  <button
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
-                  >
-                    <X size={16} />
-                    대기실 나가기
-                  </button>
-                )}
-                {status === 'playing' && (
-                  <p className="text-gray-400 text-sm">
-                    🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!
-                  </p>
-                )}
-                {(status === 'playing' || status === 'finished') && (
-                  <button
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm mt-2"
-                  >
-                    <RotateCcw size={16} />
-                    처음부터 다시하기
-                  </button>
-                )}
-              </div>
+              {/* 카운트다운 오버레이 (호스트만) */}
+              {isHost && status === 'ready' && countdown > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+                  <span className="text-[120px] font-bold text-white countdown-pop drop-shadow-lg">
+                    {countdown}
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* 오른쪽: 채팅 영역 */}
-            <div className="w-[280px] shrink-0 flex flex-col min-h-0">
-              <RouletteChat
-                groupId={groupId}
-                messages={chatMessages}
-                isActive={isChatActive}
-              />
+            {/* 하단 상태 */}
+            <div className="py-2 text-center shrink-0">
+              {status === 'waiting' && (
+                <button
+                  onClick={onClose}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
+                >
+                  <X size={16} />
+                  대기실 나가기
+                </button>
+              )}
+              {isHost && status === 'playing' && (
+                <p className="text-gray-400 text-sm">
+                  🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!
+                </p>
+              )}
             </div>
           </div>
         </div>

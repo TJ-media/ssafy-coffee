@@ -151,6 +151,15 @@ export class Box2dPhysics implements IPhysics {
     }
   }
 
+  // 스펙테이터 모드용 위치 설정
+  setMarblePosition(id: number, x: number, y: number, angle: number): void {
+    const marble = this.marbleMap[id];
+    if (marble) {
+      marble.SetTransform(new this.Box2D.b2Vec2(x, y), angle);
+      marble.SetAwake(false); // 물리 시뮬레이션 비활성화
+    }
+  }
+
   getEntities(): MapEntityState[] {
     return this.entities.map((entity) => {
       return {

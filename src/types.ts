@@ -27,6 +27,8 @@ export interface GroupData {
   history?: OrderHistory[];
   pinballGame?: PinballGameState;
   rouletteGame?: RouletteGameState;
+  rouletteHistory?: RouletteHistory[];
+  marbleCounts?: { [userName: string]: number }; // 사용자별 공 개수 (가중치)
 }
 
 export interface GroupedCartItem {
@@ -90,6 +92,16 @@ export interface PinballGameState {
   hostName?: string; // 게임을 시작한 사람 (시작 버튼 권한)
 }
 
+// 마블 위치 데이터
+export interface MarblePositionData {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  angle: number;
+  hue: number;
+}
+
 // 룰렛 게임 상태
 export interface RouletteGameState {
   status: 'idle' | 'waiting' | 'ready' | 'playing' | 'finished';
@@ -100,4 +112,16 @@ export interface RouletteGameState {
   finishOrder?: string[];
   chatMessages?: PinballChatMessage[];
   hostName?: string;
+  marblePositions?: MarblePositionData[]; // 호스트가 브로드캐스트하는 마블 위치
+}
+
+// 룰렛 히스토리
+export interface RouletteHistory {
+  id: string;
+  playedAt: any;
+  winner: string; // 커피 사야하는 사람
+  participants: string[];
+  orderItems: HistoryItem[]; // 주문 목록
+  totalPrice: number;
+  paid?: boolean; // 결제 완료 여부
 }

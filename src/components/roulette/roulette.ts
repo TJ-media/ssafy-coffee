@@ -19,6 +19,16 @@ import { MouseEventHandlerName, type MouseEventName } from './types/mouseEvents.
 import { FastForwader } from './fastForwader';
 import { ColorTheme } from './types/ColorTheme';
 
+// 마블 위치 데이터 타입
+export type MarblePosition = {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  angle: number;
+  hue: number;
+};
+
 export class Roulette extends EventTarget {
   private _marbles: Marble[] = [];
 
@@ -38,7 +48,7 @@ export class Roulette extends EventTarget {
 
   private _effects: GameObject[] = [];
 
-  private _winnerRank = 0;
+  private _winnerRank = -1; // -1이면 options에서 가져옴
   private _totalMarbleCount = 0;
   private _goalDist: number = Infinity;
   private _isRunning: boolean = false;
@@ -54,6 +64,10 @@ export class Roulette extends EventTarget {
   private _isReady: boolean = false;
   private fastForwarder!: FastForwader;
   private _theme: ColorTheme = Themes.dark;
+
+  // 스펙테이터 모드 관련
+  private _isSpectator: boolean = false;
+  private _spectatorPositions: MarblePosition[] = [];
 
   get isReady() {
     return this._isReady;
@@ -102,13 +116,24 @@ export class Roulette extends EventTarget {
 
     const interval = (this._updateInterval / 1000) * this._timeScale;
 
-    while (this._elapsed >= this._updateInterval) {
-      this.physics.step(interval);
-      this._updateMarbles(this._updateInterval);
-      this._particleManager.update(this._updateInterval);
-      this._updateEffects(this._updateInterval);
-      this._elapsed -= this._updateInterval;
-      this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+    // 스펙테이터 모드가 아닐 때만 물리 시뮬레이션 실행
+    if (!this._isSpectator) {
+      while (this._elapsed >= this._updateInterval) {
+        this.physics.step(interval);
+        this._updateMarbles(this._updateInterval);
+        this._particleManager.update(this._updateInterval);
+        this._updateEffects(this._updateInterval);
+        this._elapsed -= this._updateInterval;
+        this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+      }
+    } else {
+      // 스펙테이터 모드: 파티클과 이펙트만 업데이트
+      while (this._elapsed >= this._updateInterval) {
+        this._particleManager.update(this._updateInterval);
+        this._updateEffects(this._updateInterval);
+        this._elapsed -= this._updateInterval;
+        this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+      }
     }
 
     if (this._marbles.length > 1) {
@@ -315,7 +340,10 @@ export class Roulette extends EventTarget {
 
   public start() {
     this._isRunning = true;
-    this._winnerRank = options.winningRank;
+    // setWinningRank로 미리 설정하지 않았으면 (-1) options에서 가져옴
+    if (this._winnerRank < 0) {
+      this._winnerRank = options.winningRank;
+    }
     if (this._winnerRank >= this._marbles.length) {
       this._winnerRank = this._marbles.length - 1;
     }
@@ -355,7 +383,7 @@ export class Roulette extends EventTarget {
     this._autoRecording = value;
   }
 
-  public setMarbles(names: string[]) {
+  public setMarbles(names: string[], seed?: number) {
     this.reset();
     const arr = names.slice();
 
@@ -383,10 +411,12 @@ export class Roulette extends EventTarget {
       }
     });
 
+    // 시드를 사용하여 동일한 순서 보장
     const orders = shuffle(
       Array(totalCount)
         .fill(0)
         .map((_, i) => i),
+      seed,
     );
     members.forEach((member) => {
       if (member) {
@@ -417,6 +447,7 @@ export class Roulette extends EventTarget {
     this._clearMap();
     this._loadMap();
     this._goalDist = Infinity;
+    this._winnerRank = -1; // 다음 게임을 위해 초기화
   }
 
   public getCount() {
@@ -440,5 +471,60 @@ export class Roulette extends EventTarget {
     this._stage = stages[index];
     this.setMarbles(names);
     this._camera.initializePosition();
+  }
+
+  // 스펙테이터 모드 설정
+  public setSpectatorMode(isSpectator: boolean) {
+    this._isSpectator = isSpectator;
+  }
+
+  public isSpectatorMode() {
+    return this._isSpectator;
+  }
+
+  // 호스트가 마블 위치 가져오기
+  public getMarblePositions(): MarblePosition[] {
+    return this._marbles.map((marble) => ({
+      id: marble.id,
+      name: marble.name,
+      x: marble.x,
+      y: marble.y,
+      angle: marble.angle,
+      hue: marble.hue,
+    }));
+  }
+
+  // 스펙테이터가 마블 위치 설정
+  public setMarblePositions(positions: MarblePosition[]) {
+    if (!this._isSpectator) return;
+
+    this._spectatorPositions = positions;
+
+    // 마블 배열 업데이트 (렌더링용)
+    positions.forEach((pos) => {
+      const marble = this._marbles.find((m) => m.id === pos.id);
+      if (marble) {
+        // 물리 엔진 위치 직접 설정 (spectator용)
+        this.physics.setMarblePosition?.(pos.id, pos.x, pos.y, pos.angle);
+      }
+    });
+  }
+
+  // 승자 설정 (스펙테이터용)
+  public setWinner(winnerName: string) {
+    const winner = this._marbles.find((m) => m.name === winnerName);
+    if (winner) {
+      this._winner = winner;
+      this._isRunning = false;
+      this._particleManager.shot(
+        this._renderer.width,
+        this._renderer.height,
+      );
+    }
+  }
+
+  // 게임 실행 상태 확인
+  public isRunning() {
+    return this._isRunning;
   }
 }

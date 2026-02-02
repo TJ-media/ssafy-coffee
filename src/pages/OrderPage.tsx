@@ -2,13 +2,14 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { MEGA_MENUS, CATEGORIES } from '../menuData';
-import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History, Target } from 'lucide-react';
+import { Trash2, ShoppingCart, LogOut, ChevronDown, Plus, Minus, Heart, Link, History, Target, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, RouletteGameState } from '../types';
+import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory } from '../types';
 import { getAvatarColor, getTextContrastColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
 import Toast from '../components/Toast';
 import HistoryModal from '../components/HistoryModal';
 import RouletteModal from '../components/roulette/RouletteModal';
+import MarbleAdminModal from '../components/MarbleAdminModal';
 
 // 애니메이션 아이템 타입 정의
 interface FlyingItem {
@@ -35,11 +36,14 @@ const OrderPage = () => {
   // 새로운 기능 상태 (토스트, 히스토리, 즐겨찾기, 룰렛)
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+  const [isMarbleAdminOpen, setIsMarbleAdminOpen] = useState<boolean>(false);
   const [history, setHistory] = useState<OrderHistory[]>([]);
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
   
   // 룰렛 관련 상태
   const [rouletteGame, setRouletteGame] = useState<RouletteGameState | undefined>(undefined);
+  const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
+  const [marbleCounts, setMarbleCounts] = useState<{ [userName: string]: number }>({});
   
   const prevCartRef = useRef<CartItem[]>([]); // 실시간 알림용
 
@@ -97,9 +101,11 @@ const OrderPage = () => {
 
         // 히스토리 업데이트
         setHistory(data.history || []);
+        setRouletteHistory(data.rouletteHistory || []);
 
-        // 룰렛 게임 상태 업데이트
+        // 룰렛 게임 상태 및 공 개수 업데이트
         setRouletteGame(data.rouletteGame);
+        setMarbleCounts(data.marbleCounts || {});
       } else {
         alert('모임이 종료되었거나 존재하지 않습니다.');
         navigate('/');
@@ -338,6 +344,8 @@ const OrderPage = () => {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         history={history}
+        rouletteHistory={rouletteHistory}
+        groupId={groupId || ''}
       />
       <RouletteModal
         isOpen={isRouletteModalOpen}
@@ -345,8 +353,16 @@ const OrderPage = () => {
         groupId={groupId || ''}
         participants={rouletteParticipants}
         gameState={rouletteGame}
+        cart={cart}
+        marbleCounts={marbleCounts}
       />
-      
+      <MarbleAdminModal
+        isOpen={isMarbleAdminOpen}
+        onClose={() => setIsMarbleAdminOpen(false)}
+        marbleCounts={marbleCounts}
+        groupId={groupId || ''}
+      />
+
       {/* 2. 애니메이션 레이어 */}
       {flyingItems.map(item => (
         <div
@@ -415,7 +431,10 @@ const OrderPage = () => {
             <button onClick={() => setIsHistoryOpen(true)} className="text-text-secondary hover:text-primary p-2 transition" title="주문 히스토리">
               <History size={20}/>
             </button>
-            {/* 핀볼 게임 버튼 추가 */}
+            <button onClick={() => setIsMarbleAdminOpen(true)} className="text-text-secondary hover:text-primary p-2 transition" title="공 개수 관리">
+              <Settings size={20}/>
+            </button>
+            {/* 룰렛 게임 버튼 */}
             <button
               onClick={handleStartRoulette}
               className="text-text-secondary hover:text-primary p-2 transition"

@@ -18,6 +18,9 @@ export interface IPhysics {
 
   getMarblePosition(id: number): { x: number; y: number; angle: number; };
 
+  // 스펙테이터 모드용 위치 설정 (optional)
+  setMarblePosition?(id: number, x: number, y: number, angle: number): void;
+
   getEntities(): MapEntityState[];
 
   impact(id: number): void;
