@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History } from 'lucide-react';
-import { getAvatarColor, getTextContrastColor } from '../utils';
+import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../utils';
 import { RouletteHistory } from '../types';
 
 const ADMIN_PASSWORD = 'coffee1234'; // 관리자 비밀번호

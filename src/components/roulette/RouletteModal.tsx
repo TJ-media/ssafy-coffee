@@ -4,7 +4,7 @@ import { RouletteGameState, CartItem, GroupedCartItem, HistoryItem, RouletteHist
 import { Roulette } from './roulette';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getAvatarColor, getTextContrastColor } from '../../utils';
+import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../../utils';
 import RouletteResult from './RouletteResult';
 
 interface RouletteModalProps {
@@ -144,7 +144,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 
     const historyItem: RouletteHistory = {
       id: `roulette_${Date.now()}`,
-      playedAt: new Date(),
+      playedAt: getNextBusinessDay(), // 다음 영업일 (금요일이면 월요일)
       winner: winnerName,
       participants: participants,
       orderItems: cartToHistoryItems(cachedCart),
