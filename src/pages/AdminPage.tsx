@@ -10,14 +10,15 @@ const ADMIN_PASSWORD = 'coffee1234'; // 관리자 비밀번호
 const AdminPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
+  const [groupIdInput, setGroupIdInput] = useState('');
   const [error, setError] = useState('');
   const [marbleCounts, setMarbleCounts] = useState<{ [userName: string]: number }>({});
   const [pendingUsers, setPendingUsers] = useState<string[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'approval' | 'marble'>('approval');
+  const [groupId, setGroupId] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const groupId = localStorage.getItem('ssafy_groupId');
 
   // Firestore 구독
   useEffect(() => {
@@ -36,7 +37,12 @@ const AdminPage = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!groupIdInput.trim()) {
+      setError('모임 ID를 입력해주세요');
+      return;
+    }
     if (password === ADMIN_PASSWORD) {
+      setGroupId(groupIdInput.trim());
       setIsAuthenticated(true);
       setError('');
     } else {
@@ -144,12 +150,19 @@ const AdminPage = () => {
 
           <form onSubmit={handleLogin}>
             <input
+              type="text"
+              value={groupIdInput}
+              onChange={(e) => setGroupIdInput(e.target.value)}
+              placeholder="모임 ID (예: 서울15반)"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:outline-none mb-3"
+              autoFocus
+            />
+            <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호"
+              placeholder="관리자 비밀번호"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:outline-none mb-3"
-              autoFocus
             />
             {error && (
               <p className="text-red-500 text-sm mb-3">{error}</p>
@@ -163,7 +176,7 @@ const AdminPage = () => {
           </form>
 
           <button
-            onClick={() => navigate('/order')}
+            onClick={() => navigate('/')}
             className="w-full mt-3 py-2 text-text-secondary hover:text-text-primary transition text-sm"
           >
             ← 돌아가기
@@ -182,7 +195,12 @@ const AdminPage = () => {
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => navigate('/order')}
+            onClick={() => {
+              setIsAuthenticated(false);
+              setGroupId(null);
+              setGroupIdInput('');
+              setPassword('');
+            }}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
             <ArrowLeft size={24} className="text-text-secondary" />
