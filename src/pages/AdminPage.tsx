@@ -213,42 +213,61 @@ const AdminPage = () => {
       alert('당첨자를 입력해주세요');
       return;
     }
-    if (!newHistoryAmount || parseInt(newHistoryAmount) <= 0) {
-      alert('금액을 입력해주세요');
-      return;
-    }
 
-    const participants = newHistoryParticipants
+    // "이름:금액" 형식 파싱
+    const participantEntries = newHistoryParticipants
       .split(',')
       .map(p => p.trim())
-      .filter(p => p.length > 0);
+      .filter(p => p.length > 0)
+      .map(p => {
+        const [name, priceStr] = p.split(':').map(s => s.trim());
+        const price = parseInt(priceStr) || 0;
+        return { name, price };
+      })
+      .filter(p => p.name.length > 0);
 
-    if (participants.length === 0) {
-      alert('참가자를 입력해주세요 (쉼표로 구분)');
+    if (participantEntries.length === 0) {
+      alert('참가자를 입력해주세요 (이름:금액 형식, 쉼표로 구분)');
       return;
     }
 
-    // 당첨자가 참가자에 없으면 추가
+    // 참가자 이름 목록
+    const participants = participantEntries.map(p => p.name);
+
+    // 당첨자가 참가자에 없으면 추가 (금액 0으로)
     if (!participants.includes(newHistoryWinner.trim())) {
       participants.push(newHistoryWinner.trim());
     }
 
+    // 총 금액 계산
+    const totalPrice = participantEntries.reduce((sum, p) => sum + p.price, 0);
+
+    if (totalPrice <= 0) {
+      alert('금액을 입력해주세요');
+      return;
+    }
+
     // 날짜 처리: 입력값이 있으면 사용, 없으면 현재 시간
     const playedAt = newHistoryDate ? new Date(newHistoryDate) : new Date();
+
+    // 각 참가자별 orderItem 생성
+    const orderItems = participantEntries
+      .filter(p => p.price > 0)
+      .map(p => ({
+        menuName: '수동 입력',
+        option: 'ONLY' as const,
+        price: p.price,
+        count: 1,
+        orderedBy: [p.name],
+      }));
 
     const newRecord: RouletteHistory = {
       id: `manual_${Date.now()}`,
       playedAt: playedAt,
       winner: newHistoryWinner.trim(),
       participants: participants,
-      orderItems: [{
-        menuName: '수동 입력',
-        option: 'ONLY',
-        price: parseInt(newHistoryAmount),
-        count: 1,
-        orderedBy: participants.filter(p => p !== newHistoryWinner.trim()),
-      }],
-      totalPrice: parseInt(newHistoryAmount),
+      orderItems: orderItems,
+      totalPrice: totalPrice,
       paid: true,
     };
 
@@ -581,20 +600,15 @@ const AdminPage = () => {
                   placeholder="당첨자 (커피 산 사람)"
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
                 />
-                <input
-                  type="number"
-                  value={newHistoryAmount}
-                  onChange={(e) => setNewHistoryAmount(e.target.value)}
-                  placeholder="총 금액 (원)"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
-                />
-                <input
-                  type="text"
-                  value={newHistoryParticipants}
-                  onChange={(e) => setNewHistoryParticipants(e.target.value)}
-                  placeholder="참가자 (쉼표로 구분: 홍길동, 김철수, 이영희)"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
-                />
+                <div>
+                  <label className="text-xs text-text-secondary mb-1 block">참가자별 금액 (이름:금액, 쉼표로 구분)</label>
+                  <textarea
+                    value={newHistoryParticipants}
+                    onChange={(e) => setNewHistoryParticipants(e.target.value)}
+                    placeholder="예: 홍길동:4500, 김철수:5000, 이영희:4000"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none min-h-[80px]"
+                  />
+                </div>
                 <div>
                   <label className="text-xs text-text-secondary mb-1 block">일시 (비워두면 현재 시간)</label>
                   <input
