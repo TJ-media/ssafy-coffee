@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users } from 'lucide-react';
+import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../utils';
+import { RouletteHistory } from '../types';
 
 const ADMIN_PASSWORD = 'coffee1234'; // 관리자 비밀번호
 
@@ -15,7 +16,8 @@ const AdminPage = () => {
   const [marbleCounts, setMarbleCounts] = useState<{ [userName: string]: number }>({});
   const [pendingUsers, setPendingUsers] = useState<string[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'approval' | 'marble'>('approval');
+  const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
+  const [activeTab, setActiveTab] = useState<'approval' | 'marble' | 'stats'>('approval');
   const [groupId, setGroupId] = useState<string | null>(null);
 
   const navigate = useNavigate();
@@ -30,10 +32,57 @@ const AdminPage = () => {
         setMarbleCounts(data.marbleCounts || {});
         setPendingUsers(data.pendingUsers || []);
         setApprovedUsers(data.approvedUsers || []);
+        setRouletteHistory(data.rouletteHistory || []);
       }
     });
     return () => unsub();
   }, [groupId, isAuthenticated]);
+
+  // 통계 계산
+  const userStats = useMemo(() => {
+    const stats: { [userName: string]: { spent: number; received: number; winCount: number; playCount: number } } = {};
+
+    rouletteHistory.forEach((game) => {
+      const winner = game.winner;
+
+      // 참가자들 초기화
+      game.participants.forEach((participant) => {
+        if (!stats[participant]) {
+          stats[participant] = { spent: 0, received: 0, winCount: 0, playCount: 0 };
+        }
+        stats[participant].playCount++;
+      });
+
+      // winner가 산 금액
+      if (stats[winner]) {
+        stats[winner].spent += game.totalPrice;
+        stats[winner].winCount++;
+      }
+
+      // 각 참가자가 얻어먹은 금액 계산
+      game.orderItems.forEach((item) => {
+        const pricePerPerson = item.price; // 이미 개당 가격
+        item.orderedBy.forEach((person) => {
+          if (person !== winner && stats[person]) {
+            stats[person].received += pricePerPerson;
+          }
+        });
+      });
+    });
+
+    return stats;
+  }, [rouletteHistory]);
+
+  // 통계 정렬 (순이익 순)
+  const sortedStats = useMemo(() => {
+    return Object.entries(userStats)
+      .map(([name, data]) => ({
+        name,
+        ...data,
+        profit: data.received - data.spent,
+      }))
+      .sort((a, b) => b.profit - a.profit);
+  }, [userStats]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,8 +239,8 @@ const AdminPage = () => {
 
   // 관리 화면
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-lg mx-auto">
+    <div className="min-h-screen bg-background p-4 overflow-y-auto">
+      <div className="max-w-lg mx-auto pb-8">
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6">
           <button
@@ -215,12 +264,12 @@ const AdminPage = () => {
         <div className="bg-gray-100 p-1 rounded-xl flex mb-6">
           <button
             onClick={() => setActiveTab('approval')}
-            className={`flex-1 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
               activeTab === 'approval' ? 'bg-white shadow-sm text-primary' : 'text-text-secondary'
             }`}
           >
-            <Users size={16} />
-            입장 승인
+            <Users size={14} />
+            승인
             {pendingUsers.length > 0 && (
               <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                 {pendingUsers.length}
@@ -228,12 +277,20 @@ const AdminPage = () => {
             )}
           </button>
           <button
+            onClick={() => setActiveTab('stats')}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${
+              activeTab === 'stats' ? 'bg-white shadow-sm text-primary' : 'text-text-secondary'
+            }`}
+          >
+            📊 통계
+          </button>
+          <button
             onClick={() => setActiveTab('marble')}
-            className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${
               activeTab === 'marble' ? 'bg-white shadow-sm text-primary' : 'text-text-secondary'
             }`}
           >
-            🎱 공 개수
+            🎱 공
           </button>
         </div>
 
@@ -330,6 +387,88 @@ const AdminPage = () => {
                 </div>
               )}
             </div>
+          </div>
+        ) : activeTab === 'stats' ? (
+          /* 통계 탭 */
+          <div>
+            {/* 설명 */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-blue-800">
+                📊 룰렛 게임 기록을 바탕으로 한 통계입니다
+              </p>
+            </div>
+
+            {/* 총 게임 수 */}
+            <div className="bg-surface rounded-xl p-4 shadow-sm mb-4">
+              <div className="text-center">
+                <p className="text-text-secondary text-sm">총 게임 수</p>
+                <p className="text-3xl font-bold text-primary">{rouletteHistory.length}회</p>
+              </div>
+            </div>
+
+            {/* 사용자별 통계 */}
+            {sortedStats.length === 0 ? (
+              <div className="text-center py-12 text-text-secondary">
+                <p>아직 게임 기록이 없어요</p>
+                <p className="text-sm mt-1">룰렛 게임을 진행하면 통계가 기록됩니다</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sortedStats.map((user, index) => (
+                  <div
+                    key={user.name}
+                    className="bg-surface rounded-xl p-4 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
+                            style={{
+                              backgroundColor: getAvatarColor(user.name),
+                              color: getTextContrastColor(),
+                            }}
+                          >
+                            {user.name.slice(0, 2)}
+                          </div>
+                          {index < 3 && (
+                            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-xs font-bold text-white">
+                              {index + 1}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <span className="font-bold text-text-primary">{user.name}</span>
+                          <p className="text-xs text-text-secondary">
+                            {user.playCount}게임 / {user.winCount}번 당첨
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`text-right ${user.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className="flex items-center gap-1 justify-end">
+                          {user.profit >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                          <span className="font-bold">
+                            {user.profit >= 0 ? '+' : ''}{user.profit.toLocaleString()}원
+                          </span>
+                        </div>
+                        <p className="text-xs opacity-70">순이익</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-red-50 rounded-lg p-2 text-center">
+                        <p className="text-red-600 font-bold">{user.spent.toLocaleString()}원</p>
+                        <p className="text-xs text-red-400">산 금액</p>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-2 text-center">
+                        <p className="text-green-600 font-bold">{user.received.toLocaleString()}원</p>
+                        <p className="text-xs text-green-400">얻어먹은 금액</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           /* 공 개수 관리 탭 */
