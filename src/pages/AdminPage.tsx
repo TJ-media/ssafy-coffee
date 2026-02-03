@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History } from 'lucide-react';
+import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History, Pencil, X } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../utils';
 import { RouletteHistory } from '../types';
 
@@ -20,11 +20,11 @@ const AdminPage = () => {
   const [activeTab, setActiveTab] = useState<'approval' | 'marble' | 'stats' | 'history'>('approval');
   const [groupId, setGroupId] = useState<string | null>(null);
 
-  // 히스토리 추가 폼 상태
+  // 히스토리 추가/수정 폼 상태
   const [newHistoryWinner, setNewHistoryWinner] = useState('');
-  const [newHistoryAmount, setNewHistoryAmount] = useState('');
   const [newHistoryParticipants, setNewHistoryParticipants] = useState('');
   const [newHistoryDate, setNewHistoryDate] = useState('');
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
@@ -206,8 +206,33 @@ const AdminPage = () => {
     }
   };
 
-  // 히스토리 추가
-  const addHistory = async () => {
+  // 히스토리 수정 시작
+  const startEditHistory = (record: RouletteHistory) => {
+    setEditingHistoryId(record.id);
+    setNewHistoryWinner(record.winner);
+
+    // orderItems를 "이름:금액" 형식으로 변환
+    const participantsStr = record.orderItems
+      .map(item => item.orderedBy.map(name => `${name}:${item.price}`).join(', '))
+      .join(', ');
+    setNewHistoryParticipants(participantsStr);
+
+    // 날짜 변환
+    const date = record.playedAt?.toDate?.() || new Date(record.playedAt);
+    const dateStr = date.toISOString().slice(0, 16); // datetime-local 형식
+    setNewHistoryDate(dateStr);
+  };
+
+  // 폼 초기화
+  const resetForm = () => {
+    setNewHistoryWinner('');
+    setNewHistoryParticipants('');
+    setNewHistoryDate('');
+    setEditingHistoryId(null);
+  };
+
+  // 히스토리 추가/수정
+  const saveHistory = async () => {
     if (!groupId) return;
     if (!newHistoryWinner.trim()) {
       alert('당첨자를 입력해주세요');
@@ -262,7 +287,7 @@ const AdminPage = () => {
       }));
 
     const newRecord: RouletteHistory = {
-      id: `manual_${Date.now()}`,
+      id: editingHistoryId || `manual_${Date.now()}`,
       playedAt: playedAt,
       winner: newHistoryWinner.trim(),
       participants: participants,
@@ -273,16 +298,24 @@ const AdminPage = () => {
 
     try {
       const groupRef = doc(db, 'groups', groupId);
+
+      let updatedHistory;
+      if (editingHistoryId) {
+        // 수정 모드: 기존 항목 교체
+        updatedHistory = rouletteHistory.map(h =>
+          h.id === editingHistoryId ? newRecord : h
+        );
+      } else {
+        // 추가 모드: 배열에 추가
+        updatedHistory = [...rouletteHistory, newRecord];
+      }
+
       await updateDoc(groupRef, {
-        rouletteHistory: [...rouletteHistory, newRecord],
+        rouletteHistory: updatedHistory,
       });
 
-      // 폼 초기화
-      setNewHistoryWinner('');
-      setNewHistoryAmount('');
-      setNewHistoryParticipants('');
-      setNewHistoryDate('');
-      alert('히스토리가 추가되었습니다');
+      resetForm();
+      alert(editingHistoryId ? '히스토리가 수정되었습니다' : '히스토리가 추가되었습니다');
     } catch (e) {
       console.error('Failed to add history:', e);
     }
@@ -586,12 +619,32 @@ const AdminPage = () => {
         ) : activeTab === 'history' ? (
           /* 히스토리 관리 탭 */
           <div className="space-y-6">
-            {/* 히스토리 추가 */}
-            <div className="bg-surface rounded-xl p-4 shadow-sm">
-              <h2 className="font-bold text-text-primary mb-4 flex items-center gap-2">
-                <PlusCircle size={18} className="text-primary" />
-                기록 추가
-              </h2>
+            {/* 히스토리 추가/수정 */}
+            <div className={`bg-surface rounded-xl p-4 shadow-sm ${editingHistoryId ? 'ring-2 ring-amber-400' : ''}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-text-primary flex items-center gap-2">
+                  {editingHistoryId ? (
+                    <>
+                      <Pencil size={18} className="text-amber-500" />
+                      기록 수정
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle size={18} className="text-primary" />
+                      기록 추가
+                    </>
+                  )}
+                </h2>
+                {editingHistoryId && (
+                  <button
+                    onClick={resetForm}
+                    className="p-1.5 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                    title="취소"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
               <div className="space-y-3">
                 <input
                   type="text"
@@ -619,10 +672,14 @@ const AdminPage = () => {
                   />
                 </div>
                 <button
-                  onClick={addHistory}
-                  className="w-full py-2 bg-primary text-white rounded-lg font-bold text-sm hover:bg-primary-dark transition"
+                  onClick={saveHistory}
+                  className={`w-full py-2 text-white rounded-lg font-bold text-sm transition ${
+                    editingHistoryId
+                      ? 'bg-amber-500 hover:bg-amber-600'
+                      : 'bg-primary hover:bg-primary-dark'
+                  }`}
                 >
-                  추가하기
+                  {editingHistoryId ? '수정하기' : '추가하기'}
                 </button>
               </div>
             </div>
@@ -670,10 +727,17 @@ const AdminPage = () => {
                               <p className="text-xs text-text-secondary">{dateStr}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-primary">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-bold text-primary mr-1">
                               {record.totalPrice.toLocaleString()}원
                             </span>
+                            <button
+                              onClick={() => startEditHistory(record)}
+                              className="p-1.5 text-text-secondary hover:text-amber-500 hover:bg-amber-50 rounded-lg transition"
+                              title="수정"
+                            >
+                              <Pencil size={16} />
+                            </button>
                             <button
                               onClick={() => deleteHistory(record.id)}
                               className="p-1.5 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition"
