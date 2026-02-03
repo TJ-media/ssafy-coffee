@@ -639,7 +639,11 @@ const AdminPage = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {[...rouletteHistory].reverse().map((record) => {
+                  {[...rouletteHistory].sort((a, b) => {
+                    const dateA = a.playedAt?.toDate?.() || new Date(a.playedAt);
+                    const dateB = b.playedAt?.toDate?.() || new Date(b.playedAt);
+                    return dateB.getTime() - dateA.getTime();
+                  }).map((record) => {
                     const date = record.playedAt?.toDate?.() || new Date(record.playedAt);
                     const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
 
