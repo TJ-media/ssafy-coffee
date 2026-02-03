@@ -24,6 +24,7 @@ const AdminPage = () => {
   const [newHistoryWinner, setNewHistoryWinner] = useState('');
   const [newHistoryAmount, setNewHistoryAmount] = useState('');
   const [newHistoryParticipants, setNewHistoryParticipants] = useState('');
+  const [newHistoryDate, setNewHistoryDate] = useState('');
 
   const navigate = useNavigate();
 
@@ -232,9 +233,12 @@ const AdminPage = () => {
       participants.push(newHistoryWinner.trim());
     }
 
+    // 날짜 처리: 입력값이 있으면 사용, 없으면 현재 시간
+    const playedAt = newHistoryDate ? new Date(newHistoryDate) : new Date();
+
     const newRecord: RouletteHistory = {
       id: `manual_${Date.now()}`,
-      playedAt: new Date(),
+      playedAt: playedAt,
       winner: newHistoryWinner.trim(),
       participants: participants,
       orderItems: [{
@@ -258,6 +262,7 @@ const AdminPage = () => {
       setNewHistoryWinner('');
       setNewHistoryAmount('');
       setNewHistoryParticipants('');
+      setNewHistoryDate('');
       alert('히스토리가 추가되었습니다');
     } catch (e) {
       console.error('Failed to add history:', e);
@@ -590,6 +595,15 @@ const AdminPage = () => {
                   placeholder="참가자 (쉼표로 구분: 홍길동, 김철수, 이영희)"
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
                 />
+                <div>
+                  <label className="text-xs text-text-secondary mb-1 block">일시 (비워두면 현재 시간)</label>
+                  <input
+                    type="datetime-local"
+                    value={newHistoryDate}
+                    onChange={(e) => setNewHistoryDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
                 <button
                   onClick={addHistory}
                   className="w-full py-2 bg-primary text-white rounded-lg font-bold text-sm hover:bg-primary-dark transition"
