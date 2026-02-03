@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown } from 'lucide-react';
+import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../utils';
 import { RouletteHistory } from '../types';
 
@@ -17,8 +17,13 @@ const AdminPage = () => {
   const [pendingUsers, setPendingUsers] = useState<string[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<string[]>([]);
   const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
-  const [activeTab, setActiveTab] = useState<'approval' | 'marble' | 'stats'>('approval');
+  const [activeTab, setActiveTab] = useState<'approval' | 'marble' | 'stats' | 'history'>('approval');
   const [groupId, setGroupId] = useState<string | null>(null);
+
+  // 히스토리 추가 폼 상태
+  const [newHistoryWinner, setNewHistoryWinner] = useState('');
+  const [newHistoryAmount, setNewHistoryAmount] = useState('');
+  const [newHistoryParticipants, setNewHistoryParticipants] = useState('');
 
   const navigate = useNavigate();
 
@@ -184,6 +189,81 @@ const AdminPage = () => {
     }
   };
 
+  // 히스토리 삭제
+  const deleteHistory = async (historyId: string) => {
+    if (!groupId) return;
+    if (!confirm('이 게임 기록을 삭제할까요? 통계에도 반영됩니다.')) return;
+
+    try {
+      const newHistory = rouletteHistory.filter(h => h.id !== historyId);
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        rouletteHistory: newHistory,
+      });
+    } catch (e) {
+      console.error('Failed to delete history:', e);
+    }
+  };
+
+  // 히스토리 추가
+  const addHistory = async () => {
+    if (!groupId) return;
+    if (!newHistoryWinner.trim()) {
+      alert('당첨자를 입력해주세요');
+      return;
+    }
+    if (!newHistoryAmount || parseInt(newHistoryAmount) <= 0) {
+      alert('금액을 입력해주세요');
+      return;
+    }
+
+    const participants = newHistoryParticipants
+      .split(',')
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
+    if (participants.length === 0) {
+      alert('참가자를 입력해주세요 (쉼표로 구분)');
+      return;
+    }
+
+    // 당첨자가 참가자에 없으면 추가
+    if (!participants.includes(newHistoryWinner.trim())) {
+      participants.push(newHistoryWinner.trim());
+    }
+
+    const newRecord: RouletteHistory = {
+      id: `manual_${Date.now()}`,
+      playedAt: new Date(),
+      winner: newHistoryWinner.trim(),
+      participants: participants,
+      orderItems: [{
+        menuName: '수동 입력',
+        option: 'ONLY',
+        price: parseInt(newHistoryAmount),
+        count: 1,
+        orderedBy: participants.filter(p => p !== newHistoryWinner.trim()),
+      }],
+      totalPrice: parseInt(newHistoryAmount),
+      paid: true,
+    };
+
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        rouletteHistory: [...rouletteHistory, newRecord],
+      });
+
+      // 폼 초기화
+      setNewHistoryWinner('');
+      setNewHistoryAmount('');
+      setNewHistoryParticipants('');
+      alert('히스토리가 추가되었습니다');
+    } catch (e) {
+      console.error('Failed to add history:', e);
+    }
+  };
+
   // 비밀번호 입력 화면
   if (!isAuthenticated) {
     return (
@@ -283,6 +363,15 @@ const AdminPage = () => {
             }`}
           >
             📊 통계
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
+              activeTab === 'history' ? 'bg-white shadow-sm text-primary' : 'text-text-secondary'
+            }`}
+          >
+            <History size={14} />
+            기록
           </button>
           <button
             onClick={() => setActiveTab('marble')}
@@ -469,6 +558,108 @@ const AdminPage = () => {
                 ))}
               </div>
             )}
+          </div>
+        ) : activeTab === 'history' ? (
+          /* 히스토리 관리 탭 */
+          <div className="space-y-6">
+            {/* 히스토리 추가 */}
+            <div className="bg-surface rounded-xl p-4 shadow-sm">
+              <h2 className="font-bold text-text-primary mb-4 flex items-center gap-2">
+                <PlusCircle size={18} className="text-primary" />
+                기록 추가
+              </h2>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={newHistoryWinner}
+                  onChange={(e) => setNewHistoryWinner(e.target.value)}
+                  placeholder="당첨자 (커피 산 사람)"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                />
+                <input
+                  type="number"
+                  value={newHistoryAmount}
+                  onChange={(e) => setNewHistoryAmount(e.target.value)}
+                  placeholder="총 금액 (원)"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={newHistoryParticipants}
+                  onChange={(e) => setNewHistoryParticipants(e.target.value)}
+                  placeholder="참가자 (쉼표로 구분: 홍길동, 김철수, 이영희)"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                />
+                <button
+                  onClick={addHistory}
+                  className="w-full py-2 bg-primary text-white rounded-lg font-bold text-sm hover:bg-primary-dark transition"
+                >
+                  추가하기
+                </button>
+              </div>
+            </div>
+
+            {/* 히스토리 목록 */}
+            <div>
+              <h2 className="font-bold text-text-primary mb-3 flex items-center gap-2">
+                <History size={18} />
+                게임 기록 ({rouletteHistory.length}건)
+              </h2>
+              {rouletteHistory.length === 0 ? (
+                <div className="text-center py-8 text-text-secondary bg-gray-50 rounded-xl">
+                  <p>게임 기록이 없어요</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {[...rouletteHistory].reverse().map((record) => {
+                    const date = record.playedAt?.toDate?.() || new Date(record.playedAt);
+                    const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+                    return (
+                      <div
+                        key={record.id}
+                        className="bg-surface rounded-xl p-3 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs"
+                              style={{
+                                backgroundColor: getAvatarColor(record.winner),
+                                color: getTextContrastColor(),
+                              }}
+                            >
+                              {record.winner.slice(0, 2)}
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm text-text-primary">
+                                {record.winner} <span className="font-normal text-text-secondary">당첨</span>
+                              </p>
+                              <p className="text-xs text-text-secondary">{dateStr}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-primary">
+                              {record.totalPrice.toLocaleString()}원
+                            </span>
+                            <button
+                              onClick={() => deleteHistory(record.id)}
+                              className="p-1.5 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                              title="삭제"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-text-secondary">
+                          참가자: {record.participants.join(', ')}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           /* 공 개수 관리 탭 */
