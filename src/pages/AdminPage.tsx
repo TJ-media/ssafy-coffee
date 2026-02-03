@@ -211,11 +211,8 @@ const AdminPage = () => {
     setEditingHistoryId(record.id);
     setNewHistoryWinner(record.winner);
 
-    // orderItems를 "이름:금액" 형식으로 변환
-    const participantsStr = record.orderItems
-      .map(item => item.orderedBy.map(name => `${name}:${item.price}`).join(', '))
-      .join(', ');
-    setNewHistoryParticipants(participantsStr);
+    // 참가자 금액은 비워둠 (기존 메뉴 유지하려면 비워두면 됨)
+    setNewHistoryParticipants('');
 
     // 날짜 변환
     const date = record.playedAt?.toDate?.() || new Date(record.playedAt);
@@ -239,6 +236,11 @@ const AdminPage = () => {
       return;
     }
 
+    // 수정 모드에서 기존 기록 가져오기
+    const existingRecord = editingHistoryId
+      ? rouletteHistory.find(h => h.id === editingHistoryId)
+      : null;
+
     // "이름:금액" 형식 파싱
     const participantEntries = newHistoryParticipants
       .split(',')
@@ -251,40 +253,52 @@ const AdminPage = () => {
       })
       .filter(p => p.name.length > 0);
 
-    if (participantEntries.length === 0) {
+    // 수정 모드에서 참가자 필드가 비어있으면 기존 데이터 유지
+    const keepOriginalData = editingHistoryId && participantEntries.length === 0 && existingRecord;
+
+    if (!keepOriginalData && participantEntries.length === 0) {
       alert('참가자를 입력해주세요 (이름:금액 형식, 쉼표로 구분)');
       return;
     }
 
-    // 참가자 이름 목록
-    const participants = participantEntries.map(p => p.name);
+    let participants: string[];
+    let orderItems: any[];
+    let totalPrice: number;
 
-    // 당첨자가 참가자에 없으면 추가 (금액 0으로)
-    if (!participants.includes(newHistoryWinner.trim())) {
-      participants.push(newHistoryWinner.trim());
-    }
+    if (keepOriginalData) {
+      // 기존 데이터 유지
+      participants = existingRecord.participants;
+      orderItems = existingRecord.orderItems;
+      totalPrice = existingRecord.totalPrice;
+    } else {
+      // 새 데이터로 생성
+      participants = participantEntries.map(p => p.name);
 
-    // 총 금액 계산
-    const totalPrice = participantEntries.reduce((sum, p) => sum + p.price, 0);
+      // 당첨자가 참가자에 없으면 추가
+      if (!participants.includes(newHistoryWinner.trim())) {
+        participants.push(newHistoryWinner.trim());
+      }
 
-    if (totalPrice <= 0) {
-      alert('금액을 입력해주세요');
-      return;
+      totalPrice = participantEntries.reduce((sum, p) => sum + p.price, 0);
+
+      if (totalPrice <= 0) {
+        alert('금액을 입력해주세요');
+        return;
+      }
+
+      orderItems = participantEntries
+        .filter(p => p.price > 0)
+        .map(p => ({
+          menuName: '수동 입력',
+          option: 'ONLY' as const,
+          price: p.price,
+          count: 1,
+          orderedBy: [p.name],
+        }));
     }
 
     // 날짜 처리: 입력값이 있으면 사용, 없으면 현재 시간
     const playedAt = newHistoryDate ? new Date(newHistoryDate) : new Date();
-
-    // 각 참가자별 orderItem 생성
-    const orderItems = participantEntries
-      .filter(p => p.price > 0)
-      .map(p => ({
-        menuName: '수동 입력',
-        option: 'ONLY' as const,
-        price: p.price,
-        count: 1,
-        orderedBy: [p.name],
-      }));
 
     const newRecord: RouletteHistory = {
       id: editingHistoryId || `manual_${Date.now()}`,
@@ -293,7 +307,7 @@ const AdminPage = () => {
       participants: participants,
       orderItems: orderItems,
       totalPrice: totalPrice,
-      paid: true,
+      paid: existingRecord?.paid ?? true,
     };
 
     try {
@@ -654,11 +668,17 @@ const AdminPage = () => {
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
                 />
                 <div>
-                  <label className="text-xs text-text-secondary mb-1 block">참가자별 금액 (이름:금액, 쉼표로 구분)</label>
+                  <label className="text-xs text-text-secondary mb-1 block">
+                    {editingHistoryId
+                      ? '참가자별 금액 (비워두면 기존 메뉴 유지)'
+                      : '참가자별 금액 (이름:금액, 쉼표로 구분)'}
+                  </label>
                   <textarea
                     value={newHistoryParticipants}
                     onChange={(e) => setNewHistoryParticipants(e.target.value)}
-                    placeholder="예: 홍길동:4500, 김철수:5000, 이영희:4000"
+                    placeholder={editingHistoryId
+                      ? '비워두면 기존 메뉴 유지, 수정하려면: 홍길동:4500, 김철수:5000'
+                      : '예: 홍길동:4500, 김철수:5000, 이영희:4000'}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none min-h-[80px]"
                   />
                 </div>
