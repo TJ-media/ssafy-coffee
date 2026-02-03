@@ -29,6 +29,8 @@ export interface GroupData {
   rouletteGame?: RouletteGameState;
   rouletteHistory?: RouletteHistory[];
   marbleCounts?: { [userName: string]: number }; // 사용자별 공 개수 (가중치)
+  approvedUsers?: string[]; // 승인된 사용자 목록
+  pendingUsers?: string[]; // 승인 대기 중인 사용자 목록
 }
 
 export interface GroupedCartItem {

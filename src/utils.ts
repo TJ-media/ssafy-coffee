@@ -59,3 +59,23 @@ export const isFavorite = (menuId: number): boolean => {
   const favorites = getFavorites();
   return favorites.some(f => f.menuId === menuId);
 };
+
+// ========== 다음 영업일 계산 ==========
+// 오늘 게임하면 내일 커피 사기, 금요일이면 월요일
+export const getNextBusinessDay = (date: Date = new Date()): Date => {
+  const result = new Date(date);
+  const dayOfWeek = result.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
+
+  if (dayOfWeek === 5) {
+    // 금요일 → 월요일 (+3일)
+    result.setDate(result.getDate() + 3);
+  } else if (dayOfWeek === 6) {
+    // 토요일 → 월요일 (+2일)
+    result.setDate(result.getDate() + 2);
+  } else {
+    // 일~목요일 → 다음 날 (+1일)
+    result.setDate(result.getDate() + 1);
+  }
+
+  return result;
+};
