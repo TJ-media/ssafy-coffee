@@ -182,6 +182,58 @@ const AdminPage = () => {
     return streaks;
   }, [rouletteHistory]);
 
+  // 추가 통계 계산
+  const extraStats = useMemo(() => {
+    // 요일별 게임 수
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const gamesByDay = [0, 0, 0, 0, 0, 0, 0];
+    rouletteHistory.forEach((game) => {
+      const date = game.playedAt?.toDate?.() || new Date(game.playedAt);
+      gamesByDay[date.getDay()]++;
+    });
+    const mostActiveDay = gamesByDay.indexOf(Math.max(...gamesByDay));
+
+    // 평균 참가자 수
+    const avgParticipants = rouletteHistory.length > 0
+      ? (rouletteHistory.reduce((sum, g) => sum + g.participants.length, 0) / rouletteHistory.length).toFixed(1)
+      : '0';
+
+    // 최장 연속 안전 기록 보유자
+    let maxSafeStreak = { name: '', count: 0 };
+    Object.entries(streakStats).forEach(([name, data]) => {
+      const safeCount = data.streakType === 'safe' ? data.currentStreak : data.maxStreak;
+      if (safeCount > maxSafeStreak.count) {
+        maxSafeStreak = { name, count: safeCount };
+      }
+    });
+
+    // 현재 연속 안전 중인 사람들 (위험도 높음)
+    const currentSafeStreaks = Object.entries(streakStats)
+      .filter(([_, data]) => data.streakType === 'safe' && data.currentStreak >= 2)
+      .map(([name, data]) => ({ name, streak: data.currentStreak }))
+      .sort((a, b) => b.streak - a.streak);
+
+    // 이번 주 게임 수
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    const thisWeekGames = rouletteHistory.filter((game) => {
+      const date = game.playedAt?.toDate?.() || new Date(game.playedAt);
+      return date >= weekStart;
+    }).length;
+
+    return {
+      gamesByDay,
+      dayNames,
+      mostActiveDay,
+      avgParticipants,
+      maxSafeStreak,
+      currentSafeStreaks,
+      thisWeekGames,
+    };
+  }, [rouletteHistory, streakStats]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupIdInput.trim()) {
@@ -763,6 +815,87 @@ const AdminPage = () => {
               </div>
             )}
 
+            {/* 요일별 & 추가 통계 */}
+            {rouletteHistory.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                {/* 요일별 게임 */}
+                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-100">
+                  <h3 className="font-bold text-indigo-800 mb-2 text-sm">📅 요일별 게임</h3>
+                  <div className="flex justify-between items-end h-16 mb-2">
+                    {extraStats.gamesByDay.map((count, idx) => (
+                      <div key={idx} className="flex flex-col items-center gap-1">
+                        <div
+                          className={`w-5 rounded-t transition-all ${
+                            idx === extraStats.mostActiveDay ? 'bg-indigo-500' : 'bg-indigo-200'
+                          }`}
+                          style={{ height: `${Math.max(4, (count / Math.max(...extraStats.gamesByDay)) * 48)}px` }}
+                        />
+                        <span className={`text-[10px] ${idx === extraStats.mostActiveDay ? 'font-bold text-indigo-600' : 'text-indigo-400'}`}>
+                          {extraStats.dayNames[idx]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-indigo-600 text-center">
+                    <span className="font-bold">{extraStats.dayNames[extraStats.mostActiveDay]}요일</span>에 가장 많이 해요
+                  </p>
+                </div>
+
+                {/* 기타 통계 */}
+                <div className="bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl p-4 border border-cyan-100">
+                  <h3 className="font-bold text-cyan-800 mb-2 text-sm">📈 기타 통계</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-cyan-600">평균 참가자</span>
+                      <span className="font-bold text-cyan-800">{extraStats.avgParticipants}명</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-cyan-600">이번 주 게임</span>
+                      <span className="font-bold text-cyan-800">{extraStats.thisWeekGames}회</span>
+                    </div>
+                    {extraStats.maxSafeStreak.name && (
+                      <div className="flex justify-between">
+                        <span className="text-cyan-600">최장 연속 안전</span>
+                        <span className="font-bold text-cyan-800">{extraStats.maxSafeStreak.name} ({extraStats.maxSafeStreak.count}연속)</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 위험 알림 - 연속 안전 중인 사람들 */}
+            {extraStats.currentSafeStreaks.length > 0 && (
+              <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-4 border border-red-100">
+                <h3 className="font-bold text-red-800 mb-3 text-sm">⚠️ 당첨 위험 알림</h3>
+                <p className="text-xs text-red-600 mb-3">연속으로 안전한 사람들! 다음 게임에서 조심하세요 👀</p>
+                <div className="flex flex-wrap gap-2">
+                  {extraStats.currentSafeStreaks.map(({ name, streak }) => (
+                    <div
+                      key={name}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
+                        streak >= 5 ? 'bg-red-200 text-red-800' :
+                        streak >= 3 ? 'bg-orange-200 text-orange-800' :
+                        'bg-yellow-200 text-yellow-800'
+                      }`}
+                    >
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
+                        style={{
+                          backgroundColor: getAvatarColor(name),
+                          color: getTextContrastColor(),
+                        }}
+                      >
+                        {name.slice(0, 1)}
+                      </div>
+                      <span className="font-bold text-sm">{name}</span>
+                      <span className="text-xs font-bold">{streak}연속 🔥</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 본전 계산기 */}
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
               <h3 className="font-bold text-green-800 mb-3 text-sm">🧮 본전 계산기</h3>
@@ -777,23 +910,35 @@ const AdminPage = () => {
                 <span className="flex items-center text-sm text-green-600">원</span>
               </div>
               {sortedStats.length > 0 && coffeePrice && (
-                <div className="space-y-2">
-                  {sortedStats.slice(0, 5).map((user) => {
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {sortedStats.map((user) => {
                     const price = parseInt(coffeePrice) || 4500;
                     const deficit = -user.profit; // 적자 금액
                     const gamesNeeded = deficit > 0 ? Math.ceil(deficit / price) : 0;
                     const isProfit = user.profit >= 0;
+                    const cupsProfit = Math.floor(Math.abs(user.profit) / price);
 
                     return (
                       <div key={user.name} className="flex items-center justify-between bg-white/70 rounded-lg px-3 py-2">
-                        <span className="font-medium text-green-800">{user.name}</span>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
+                            style={{
+                              backgroundColor: getAvatarColor(user.name),
+                              color: getTextContrastColor(),
+                            }}
+                          >
+                            {user.name.slice(0, 1)}
+                          </div>
+                          <span className="font-medium text-green-800">{user.name}</span>
+                        </div>
                         {isProfit ? (
                           <span className="text-sm text-green-600 font-bold">
-                            ✅ 이미 +{Math.floor(user.profit / price)}잔 이득!
+                            ☕ +{cupsProfit}잔 이득!
                           </span>
                         ) : (
                           <span className="text-sm text-amber-600">
-                            {gamesNeeded}번 더 이겨야 본전
+                            ☕ {gamesNeeded}번 이겨야 본전
                           </span>
                         )}
                       </div>
