@@ -21,11 +21,11 @@ export interface CartItem {
 
 export interface GroupData {
   password?: string;
+  adminPassword?: string; // 관리자 비밀번호
   createdAt?: any;
   cart: CartItem[];
   selectedCafe: string;
   history?: OrderHistory[];
-  pinballGame?: PinballGameState;
   rouletteGame?: RouletteGameState;
   rouletteHistory?: RouletteHistory[];
   marbleCounts?: { [userName: string]: number }; // 사용자별 공 개수 (가중치)
@@ -74,24 +74,12 @@ export interface ToastMessage {
   type: 'info' | 'success' | 'warning';
 }
 
-// 핀볼 채팅 메시지
-export interface PinballChatMessage {
+// 채팅 메시지
+export interface ChatMessage {
   id: string;
   userName: string;
   message: string;
   timestamp: number;
-}
-
-// 핀볼 게임 상태
-export interface PinballGameState {
-  status: 'idle' | 'waiting' | 'ready' | 'playing' | 'finished';
-  participants: string[];
-  seed: number;
-  startedAt?: any;
-  winner?: string;
-  finishOrder?: string[];
-  chatMessages?: PinballChatMessage[];
-  hostName?: string; // 게임을 시작한 사람 (시작 버튼 권한)
 }
 
 // 마블 위치 데이터
@@ -112,7 +100,7 @@ export interface RouletteGameState {
   startedAt?: any;
   winner?: string;
   finishOrder?: string[];
-  chatMessages?: PinballChatMessage[];
+  chatMessages?: ChatMessage[];
   hostName?: string;
   marblePositions?: MarblePositionData[]; // 호스트가 브로드캐스트하는 마블 위치
 }

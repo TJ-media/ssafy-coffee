@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
-import { GroupData, CartItem, Menu, OptionType, ToastMessage, OrderHistory, PinballGameState } from '../types';
+import { GroupData, CartItem, Menu, OptionType, ToastMessage, OrderHistory } from '../types';
 import { getAvatarColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
 
 // 애니메이션 타입
@@ -28,12 +28,10 @@ export const useOrderLogic = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
 
-  // 모달 상태 (Race 관련 상태 삭제됨)
+  // 모달 상태
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isPinballOpen, setIsPinballOpen] = useState(false);
 
   const [history, setHistory] = useState<OrderHistory[]>([]);
-  const [pinballGame, setPinballGame] = useState<PinballGameState | undefined>(undefined);
 
   // 애니메이션 상태
   const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
@@ -76,7 +74,6 @@ export const useOrderLogic = () => {
         setCart(currentCart);
         setTotalPrice(currentCart.reduce((sum, item) => sum + item.price, 0));
         setHistory(data.history || []);
-        setPinballGame(data.pinballGame);
       } else {
         alert('존재하지 않는 모임입니다.');
         navigate('/');
@@ -157,12 +154,11 @@ export const useOrderLogic = () => {
 
   return {
     // Data
-    groupId, userName, cart, totalPrice, toasts, history, pinballGame,
+    groupId, userName, cart, totalPrice, toasts, history,
     selectedCategory, selectedSubCategory, favoriteMenuIds,
     flyingItems,
     // Modals
     isHistoryOpen, setIsHistoryOpen,
-    isPinballOpen, setIsPinballOpen,
     // Actions
     setSelectedCategory, setSelectedSubCategory,
     addToast, removeToast, toggleFavorite,

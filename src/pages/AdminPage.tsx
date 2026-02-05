@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History, Pencil, X } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../utils';
-import { RouletteHistory } from '../types';
-
-const ADMIN_PASSWORD = 'coffee1234'; // 관리자 비밀번호
+import { RouletteHistory, GroupData } from '../types';
 
 const AdminPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -90,18 +88,35 @@ const AdminPage = () => {
       .sort((a, b) => b.profit - a.profit);
   }, [userStats]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupIdInput.trim()) {
       setError('모임 ID를 입력해주세요');
       return;
     }
-    if (password === ADMIN_PASSWORD) {
-      setGroupId(groupIdInput.trim());
-      setIsAuthenticated(true);
-      setError('');
-    } else {
-      setError('비밀번호가 틀렸어요');
+
+    try {
+      const groupRef = doc(db, 'groups', groupIdInput.trim());
+      const docSnap = await getDoc(groupRef);
+
+      if (!docSnap.exists()) {
+        setError('존재하지 않는 모임입니다');
+        return;
+      }
+
+      const data = docSnap.data() as GroupData;
+      const adminPw = data.adminPassword || data.password; // adminPassword가 없으면 일반 비밀번호 사용
+
+      if (password === adminPw) {
+        setGroupId(groupIdInput.trim());
+        setIsAuthenticated(true);
+        setError('');
+      } else {
+        setError('비밀번호가 틀렸어요');
+      }
+    } catch (e) {
+      console.error('Login error:', e);
+      setError('로그인 중 오류가 발생했습니다');
     }
   };
 
