@@ -22,6 +22,9 @@ const AdminPage = () => {
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
 
+  // 통계 탭 상태
+  const [coffeePrice, setCoffeePrice] = useState<string>('4500'); // 본전 계산용
+
   // 히스토리 추가/수정 폼 상태
   const [newHistoryWinner, setNewHistoryWinner] = useState('');
   const [newHistoryParticipants, setNewHistoryParticipants] = useState('');
@@ -81,16 +84,103 @@ const AdminPage = () => {
     return stats;
   }, [rouletteHistory]);
 
-  // 통계 정렬 (순이익 순)
+  // 통계 정렬 (순이익 순) + 확장 통계
   const sortedStats = useMemo(() => {
     return Object.entries(userStats)
-      .map(([name, data]) => ({
-        name,
-        ...data,
-        profit: data.received - data.spent,
-      }))
+      .map(([name, data]) => {
+        const profit = data.received - data.spent;
+        const winRate = data.playCount > 0 ? (data.winCount / data.playCount) * 100 : 0;
+        // 운 지수: 기대 당첨 횟수 대비 실제 당첨 횟수 (100이면 평균, 낮을수록 운 좋음)
+        // 평균적으로 참가자 수가 N명이면 1/N 확률로 당첨
+        // 여기서는 단순히 당첨률이 낮을수록 운이 좋은 것으로 계산
+        const luckIndex = data.playCount > 0 ? Math.round((1 - winRate / 100) * 100) : 50;
+        return {
+          name,
+          ...data,
+          profit,
+          winRate,
+          luckIndex,
+        };
+      })
       .sort((a, b) => b.profit - a.profit);
   }, [userStats]);
+
+  // 전체 통계
+  const globalStats = useMemo(() => {
+    const totalGames = rouletteHistory.length;
+    const totalAmount = rouletteHistory.reduce((sum, g) => sum + g.totalPrice, 0);
+    const avgAmount = totalGames > 0 ? Math.round(totalAmount / totalGames) : 0;
+    const maxGame = rouletteHistory.reduce((max, g) => g.totalPrice > (max?.totalPrice || 0) ? g : max, rouletteHistory[0]);
+    const minGame = rouletteHistory.reduce((min, g) => g.totalPrice < (min?.totalPrice || Infinity) ? g : min, rouletteHistory[0]);
+
+    // 가장 운 좋은/나쁜 사람
+    const luckiest = sortedStats.length > 0 ? sortedStats.reduce((best, u) => u.luckIndex > best.luckIndex ? u : best) : null;
+    const unluckiest = sortedStats.length > 0 ? sortedStats.reduce((worst, u) => u.luckIndex < worst.luckIndex ? u : worst) : null;
+
+    // 최다 당첨자
+    const mostWins = sortedStats.length > 0 ? sortedStats.reduce((max, u) => u.winCount > max.winCount ? u : max) : null;
+
+    // 최다 참가자
+    const mostPlays = sortedStats.length > 0 ? sortedStats.reduce((max, u) => u.playCount > max.playCount ? u : max) : null;
+
+    return {
+      totalGames,
+      totalAmount,
+      avgAmount,
+      maxGame,
+      minGame,
+      luckiest,
+      unluckiest,
+      mostWins,
+      mostPlays,
+    };
+  }, [rouletteHistory, sortedStats]);
+
+  // 연속 기록 계산
+  const streakStats = useMemo(() => {
+    const streaks: { [name: string]: { currentStreak: number; maxStreak: number; streakType: 'win' | 'safe' | null } } = {};
+
+    // 시간순 정렬
+    const sortedGames = [...rouletteHistory].sort((a, b) => {
+      const dateA = a.playedAt?.toDate?.() || new Date(a.playedAt);
+      const dateB = b.playedAt?.toDate?.() || new Date(b.playedAt);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    sortedGames.forEach((game) => {
+      game.participants.forEach((name) => {
+        if (!streaks[name]) {
+          streaks[name] = { currentStreak: 0, maxStreak: 0, streakType: null };
+        }
+
+        if (game.winner === name) {
+          // 당첨됨 (연속 안전 끊김)
+          if (streaks[name].streakType === 'safe') {
+            streaks[name].maxStreak = Math.max(streaks[name].maxStreak, streaks[name].currentStreak);
+          }
+          streaks[name].currentStreak = 1;
+          streaks[name].streakType = 'win';
+        } else {
+          // 안전함
+          if (streaks[name].streakType === 'safe') {
+            streaks[name].currentStreak++;
+          } else {
+            streaks[name].currentStreak = 1;
+            streaks[name].streakType = 'safe';
+          }
+        }
+      });
+    });
+
+    // 마지막 streak도 maxStreak에 반영
+    Object.values(streaks).forEach((s) => {
+      if (s.streakType === 'safe') {
+        s.maxStreak = Math.max(s.maxStreak, s.currentStreak);
+      }
+    });
+
+    return streaks;
+  }, [rouletteHistory]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -608,85 +698,192 @@ const AdminPage = () => {
           </div>
         ) : activeTab === 'stats' ? (
           /* 통계 탭 */
-          <div>
-            {/* 설명 */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-              <p className="text-sm text-blue-800">
-                📊 룰렛 게임 기록을 바탕으로 한 통계입니다
-              </p>
-            </div>
-
-            {/* 총 게임 수 */}
-            <div className="bg-surface rounded-xl p-4 shadow-sm mb-4">
-              <div className="text-center">
-                <p className="text-text-secondary text-sm">총 게임 수</p>
-                <p className="text-3xl font-bold text-primary">{rouletteHistory.length}회</p>
+          <div className="space-y-4">
+            {/* 전체 요약 카드 */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-surface rounded-xl p-3 shadow-sm text-center">
+                <p className="text-2xl font-bold text-primary">{globalStats.totalGames}</p>
+                <p className="text-xs text-text-secondary">총 게임</p>
+              </div>
+              <div className="bg-surface rounded-xl p-3 shadow-sm text-center">
+                <p className="text-2xl font-bold text-amber-500">{(globalStats.totalAmount / 10000).toFixed(1)}만</p>
+                <p className="text-xs text-text-secondary">총 금액</p>
+              </div>
+              <div className="bg-surface rounded-xl p-3 shadow-sm text-center">
+                <p className="text-2xl font-bold text-blue-500">{globalStats.avgAmount.toLocaleString()}</p>
+                <p className="text-xs text-text-secondary">평균/게임</p>
               </div>
             </div>
 
-            {/* 사용자별 통계 */}
-            {sortedStats.length === 0 ? (
-              <div className="text-center py-12 text-text-secondary">
-                <p>아직 게임 기록이 없어요</p>
-                <p className="text-sm mt-1">룰렛 게임을 진행하면 통계가 기록됩니다</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sortedStats.map((user, index) => (
-                  <div
-                    key={user.name}
-                    className="bg-surface rounded-xl p-4 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-                            style={{
-                              backgroundColor: getAvatarColor(user.name),
-                              color: getTextContrastColor(),
-                            }}
-                          >
-                            {user.name.slice(0, 2)}
-                          </div>
-                          {index < 3 && (
-                            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-xs font-bold text-white">
-                              {index + 1}
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <span className="font-bold text-text-primary">{user.name}</span>
-                          <p className="text-xs text-text-secondary">
-                            {user.playCount}게임 / {user.winCount}번 당첨
-                          </p>
-                        </div>
-                      </div>
-                      <div className={`text-right ${user.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        <div className="flex items-center gap-1 justify-end">
-                          {user.profit >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                          <span className="font-bold">
-                            {user.profit >= 0 ? '+' : ''}{user.profit.toLocaleString()}원
-                          </span>
-                        </div>
-                        <p className="text-xs opacity-70">순이익</p>
-                      </div>
+            {/* 재미 통계 */}
+            {sortedStats.length > 0 && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
+                <h3 className="font-bold text-purple-800 mb-3 text-sm">🎲 재미 통계</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {globalStats.luckiest && (
+                    <div className="bg-white/70 rounded-lg p-2">
+                      <p className="text-xs text-purple-600">🍀 가장 운 좋은</p>
+                      <p className="font-bold text-purple-800">{globalStats.luckiest.name}</p>
+                      <p className="text-xs text-purple-500">당첨률 {globalStats.luckiest.winRate.toFixed(1)}%</p>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="bg-red-50 rounded-lg p-2 text-center">
-                        <p className="text-red-600 font-bold">{user.spent.toLocaleString()}원</p>
-                        <p className="text-xs text-red-400">산 금액</p>
-                      </div>
-                      <div className="bg-green-50 rounded-lg p-2 text-center">
-                        <p className="text-green-600 font-bold">{user.received.toLocaleString()}원</p>
-                        <p className="text-xs text-green-400">얻어먹은 금액</p>
-                      </div>
+                  )}
+                  {globalStats.unluckiest && (
+                    <div className="bg-white/70 rounded-lg p-2">
+                      <p className="text-xs text-pink-600">😢 가장 운 나쁜</p>
+                      <p className="font-bold text-pink-800">{globalStats.unluckiest.name}</p>
+                      <p className="text-xs text-pink-500">당첨률 {globalStats.unluckiest.winRate.toFixed(1)}%</p>
                     </div>
+                  )}
+                  {globalStats.mostWins && (
+                    <div className="bg-white/70 rounded-lg p-2">
+                      <p className="text-xs text-amber-600">☕ 최다 당첨</p>
+                      <p className="font-bold text-amber-800">{globalStats.mostWins.name}</p>
+                      <p className="text-xs text-amber-500">{globalStats.mostWins.winCount}번 당첨</p>
+                    </div>
+                  )}
+                  {globalStats.mostPlays && (
+                    <div className="bg-white/70 rounded-lg p-2">
+                      <p className="text-xs text-blue-600">🎮 최다 참가</p>
+                      <p className="font-bold text-blue-800">{globalStats.mostPlays.name}</p>
+                      <p className="text-xs text-blue-500">{globalStats.mostPlays.playCount}게임 참가</p>
+                    </div>
+                  )}
+                </div>
+                {globalStats.maxGame && (
+                  <div className="mt-3 pt-3 border-t border-purple-200">
+                    <p className="text-xs text-purple-600">💰 역대 최고 금액 게임</p>
+                    <p className="font-bold text-purple-800">
+                      {globalStats.maxGame.totalPrice.toLocaleString()}원
+                      <span className="text-xs font-normal text-purple-500 ml-1">
+                        ({globalStats.maxGame.winner}님이 샀음)
+                      </span>
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             )}
+
+            {/* 본전 계산기 */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
+              <h3 className="font-bold text-green-800 mb-3 text-sm">🧮 본전 계산기</h3>
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="number"
+                  value={coffeePrice}
+                  onChange={(e) => setCoffeePrice(e.target.value)}
+                  placeholder="커피 1잔 가격"
+                  className="flex-1 px-3 py-2 rounded-lg border border-green-200 text-sm focus:border-green-500 focus:outline-none"
+                />
+                <span className="flex items-center text-sm text-green-600">원</span>
+              </div>
+              {sortedStats.length > 0 && coffeePrice && (
+                <div className="space-y-2">
+                  {sortedStats.slice(0, 5).map((user) => {
+                    const price = parseInt(coffeePrice) || 4500;
+                    const deficit = -user.profit; // 적자 금액
+                    const gamesNeeded = deficit > 0 ? Math.ceil(deficit / price) : 0;
+                    const isProfit = user.profit >= 0;
+
+                    return (
+                      <div key={user.name} className="flex items-center justify-between bg-white/70 rounded-lg px-3 py-2">
+                        <span className="font-medium text-green-800">{user.name}</span>
+                        {isProfit ? (
+                          <span className="text-sm text-green-600 font-bold">
+                            ✅ 이미 +{Math.floor(user.profit / price)}잔 이득!
+                          </span>
+                        ) : (
+                          <span className="text-sm text-amber-600">
+                            {gamesNeeded}번 더 이겨야 본전
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 개인별 상세 통계 */}
+            <div>
+              <h3 className="font-bold text-text-primary mb-3 text-sm">👥 개인별 상세 통계</h3>
+              {sortedStats.length === 0 ? (
+                <div className="text-center py-12 text-text-secondary">
+                  <p>아직 게임 기록이 없어요</p>
+                  <p className="text-sm mt-1">룰렛 게임을 진행하면 통계가 기록됩니다</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sortedStats.map((user, index) => {
+                    const streak = streakStats[user.name];
+                    return (
+                      <div
+                        key={user.name}
+                        className="bg-surface rounded-xl p-4 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
+                                style={{
+                                  backgroundColor: getAvatarColor(user.name),
+                                  color: getTextContrastColor(),
+                                }}
+                              >
+                                {user.name.slice(0, 2)}
+                              </div>
+                              {index < 3 && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-xs font-bold text-white">
+                                  {index + 1}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-bold text-text-primary">{user.name}</span>
+                              <p className="text-xs text-text-secondary">
+                                {user.playCount}게임 · {user.winCount}번 당첨 · 당첨률 {user.winRate.toFixed(1)}%
+                              </p>
+                            </div>
+                          </div>
+                          <div className={`text-right ${user.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <div className="flex items-center gap-1 justify-end">
+                              {user.profit >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                              <span className="font-bold">
+                                {user.profit >= 0 ? '+' : ''}{user.profit.toLocaleString()}원
+                              </span>
+                            </div>
+                            <p className="text-xs opacity-70">순이익</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2 text-sm">
+                          <div className="bg-red-50 rounded-lg p-2 text-center">
+                            <p className="text-red-600 font-bold text-xs">{user.spent.toLocaleString()}</p>
+                            <p className="text-[10px] text-red-400">산 금액</p>
+                          </div>
+                          <div className="bg-green-50 rounded-lg p-2 text-center">
+                            <p className="text-green-600 font-bold text-xs">{user.received.toLocaleString()}</p>
+                            <p className="text-[10px] text-green-400">얻은 금액</p>
+                          </div>
+                          <div className="bg-blue-50 rounded-lg p-2 text-center">
+                            <p className="text-blue-600 font-bold text-xs">
+                              {streak?.currentStreak || 0}연속
+                            </p>
+                            <p className="text-[10px] text-blue-400">
+                              {streak?.streakType === 'safe' ? '안전' : streak?.streakType === 'win' ? '당첨' : '-'}
+                            </p>
+                          </div>
+                          <div className="bg-purple-50 rounded-lg p-2 text-center">
+                            <p className="text-purple-600 font-bold text-xs">{user.luckIndex}</p>
+                            <p className="text-[10px] text-purple-400">운 지수</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         ) : activeTab === 'history' ? (
           /* 히스토리 관리 탭 */
