@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History, Pencil, X } from 'lucide-react';
+import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History, Pencil, X, Settings, Key } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../utils';
 import { RouletteHistory, GroupData } from '../types';
 
@@ -15,8 +15,12 @@ const AdminPage = () => {
   const [pendingUsers, setPendingUsers] = useState<string[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<string[]>([]);
   const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
-  const [activeTab, setActiveTab] = useState<'approval' | 'marble' | 'stats' | 'history'>('approval');
+  const [activeTab, setActiveTab] = useState<'approval' | 'marble' | 'stats' | 'history' | 'settings'>('approval');
   const [groupId, setGroupId] = useState<string | null>(null);
+
+  // 설정 탭 상태
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
 
   // 히스토리 추가/수정 폼 상태
   const [newHistoryWinner, setNewHistoryWinner] = useState('');
@@ -350,6 +354,36 @@ const AdminPage = () => {
     }
   };
 
+  // 관리자 비밀번호 변경
+  const changeAdminPassword = async () => {
+    if (!groupId) return;
+    if (!newAdminPassword.trim()) {
+      alert('새 비밀번호를 입력해주세요');
+      return;
+    }
+    if (newAdminPassword !== confirmAdminPassword) {
+      alert('비밀번호가 일치하지 않습니다');
+      return;
+    }
+    if (newAdminPassword.length < 4) {
+      alert('비밀번호는 4자리 이상이어야 합니다');
+      return;
+    }
+
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        adminPassword: newAdminPassword,
+      });
+      setNewAdminPassword('');
+      setConfirmAdminPassword('');
+      alert('관리자 비밀번호가 변경되었습니다');
+    } catch (e) {
+      console.error('Failed to change admin password:', e);
+      alert('비밀번호 변경에 실패했습니다');
+    }
+  };
+
   // 비밀번호 입력 화면
   if (!isAuthenticated) {
     return (
@@ -466,6 +500,15 @@ const AdminPage = () => {
             }`}
           >
             🎱 공
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
+              activeTab === 'settings' ? 'bg-white shadow-sm text-primary' : 'text-text-secondary'
+            }`}
+          >
+            <Settings size={14} />
+            설정
           </button>
         </div>
 
@@ -792,7 +835,7 @@ const AdminPage = () => {
               )}
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'marble' ? (
           /* 공 개수 관리 탭 */
           <div>
             {/* 설명 */}
@@ -864,6 +907,54 @@ const AdminPage = () => {
                 </button>
               </>
             )}
+          </div>
+        ) : (
+          /* 설정 탭 */
+          <div className="space-y-6">
+            {/* 관리자 비밀번호 변경 */}
+            <div className="bg-surface rounded-xl p-4 shadow-sm">
+              <h2 className="font-bold text-text-primary flex items-center gap-2 mb-4">
+                <Key size={18} className="text-primary" />
+                관리자 비밀번호 변경
+              </h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-text-secondary mb-1 block">새 비밀번호</label>
+                  <input
+                    type="password"
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    placeholder="새 관리자 비밀번호"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary mb-1 block">비밀번호 확인</label>
+                  <input
+                    type="password"
+                    value={confirmAdminPassword}
+                    onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                    placeholder="비밀번호 다시 입력"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={changeAdminPassword}
+                  disabled={!newAdminPassword || !confirmAdminPassword}
+                  className="w-full py-2 bg-primary text-white rounded-lg font-bold text-sm hover:bg-primary-dark transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  비밀번호 변경
+                </button>
+              </div>
+            </div>
+
+            {/* 안내 */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p className="text-sm text-blue-800">
+                💡 관리자 비밀번호는 입장 비밀번호와 별도로 설정할 수 있어요.
+                설정하지 않으면 입장 비밀번호로 관리자 페이지에 접근할 수 있습니다.
+              </p>
+            </div>
           </div>
         )}
       </div>
