@@ -10,6 +10,7 @@ const LandingPage = () => {
   const [isJoin, setIsJoin] = useState<boolean>(true);
   const [groupId, setGroupId] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [adminPassword, setAdminPassword] = useState<string>(''); // 관리자 비밀번호
   const [userName, setUserName] = useState<string>('');
 
   // 에러 및 상태 메시지
@@ -158,6 +159,7 @@ const LandingPage = () => {
     const groupRef = doc(db, 'groups', groupId);
     const newGroup: GroupData = {
       password,
+      adminPassword: adminPassword || password, // 관리자 비밀번호 (미입력 시 일반 비밀번호 사용)
       createdAt: new Date(),
       cart: [],
       selectedCafe: cafeId,
@@ -182,6 +184,7 @@ const LandingPage = () => {
     setPwMsg({type:'', text:''});
     setGroupId('');
     setPassword('');
+    setAdminPassword('');
   };
 
   // 대기 취소
@@ -277,6 +280,22 @@ const LandingPage = () => {
                   </p>
                 )}
               </div>
+
+              {/* 관리자 비밀번호 (새로 만들기 모드에서만) */}
+              {!isJoin && (
+                <div className="relative">
+                  <input
+                    type="password"
+                    placeholder="관리자 비밀번호 (선택)"
+                    className="w-full p-4 bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                  />
+                  <p className="text-xs mt-1 ml-1 text-text-secondary">
+                    미입력 시 입장 비밀번호로 설정됩니다
+                  </p>
+                </div>
+              )}
 
               <input
                 type="text" placeholder="내 이름 (예: 김싸피)"

@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Send } from 'lucide-react';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { PinballChatMessage } from '../../types';
+import { ChatMessage } from '../../types';
 import { getAvatarColor, getTextContrastColor } from '../../utils';
 
 interface RouletteChatProps {
   groupId: string;
-  messages: PinballChatMessage[];
+  messages: ChatMessage[];
   isActive: boolean; // ready 또는 playing 상태일 때만 true
 }
 
@@ -26,7 +26,7 @@ const RouletteChat = ({ groupId, messages, isActive }: RouletteChatProps) => {
   const handleSend = async () => {
     if (!inputValue.trim() || !isActive || isSending) return;
 
-    const newMessage: PinballChatMessage = {
+    const newMessage: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userName,
       message: inputValue.trim(),
