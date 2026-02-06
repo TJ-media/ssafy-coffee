@@ -2,6 +2,7 @@ import { IPhysics } from './IPhysics';
 import { StageDef } from './data/maps';
 import Box2DFactory from 'box2d-wasm';
 import { MapEntity, MapEntityState } from './types/MapEntity.type';
+import { createSeededRandom } from './utils/utils';
 
 export class Box2dPhysics implements IPhysics {
   private Box2D!: typeof Box2D & EmscriptenModule;
@@ -13,11 +14,18 @@ export class Box2dPhysics implements IPhysics {
 
   private deleteCandidates: Box2D.b2Body[] = [];
 
+  // 시드 기반 랜덤 (결정론적 시뮬레이션용)
+  private seededRandom: () => number = Math.random;
+
   async init(): Promise<void> {
     this.Box2D = await Box2DFactory();
     this.gravity = new this.Box2D.b2Vec2(0, 10);
     this.world = new this.Box2D.b2World(this.gravity);
     console.log('box2d ready');
+  }
+
+  setSeed(seed: number): void {
+    this.seededRandom = createSeededRandom(seed);
   }
 
   clear(): void {
@@ -117,7 +125,7 @@ export class Box2dPhysics implements IPhysics {
     bodyDef.set_position(new this.Box2D.b2Vec2(x, y));
 
     const body = this.world.CreateBody(bodyDef);
-    body.CreateFixture(circleShape, 1 + Math.random());
+    body.CreateFixture(circleShape, 1 + this.seededRandom());
     body.SetAwake(false);
     body.SetEnabled(false);
     this.marbleMap[id] = body;
@@ -127,7 +135,7 @@ export class Box2dPhysics implements IPhysics {
     const body = this.marbleMap[id];
     if (body) {
       body.ApplyLinearImpulseToCenter(
-        new this.Box2D.b2Vec2(Math.random() * 10 - 5, Math.random() * 10 - 5),
+        new this.Box2D.b2Vec2(this.seededRandom() * 10 - 5, this.seededRandom() * 10 - 5),
         true,
       );
     }

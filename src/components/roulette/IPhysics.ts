@@ -10,6 +10,9 @@ export interface IPhysics {
 
   createStage(stage: StageDef): void;
 
+  // 시드 설정 (결정론적 시뮬레이션용)
+  setSeed(seed: number): void;
+
   createMarble(id: number, x: number, y: number): void;
 
   shakeMarble(id: number): void;

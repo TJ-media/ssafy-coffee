@@ -1,4 +1,4 @@
-import { Trophy, Coffee, RotateCcw } from 'lucide-react';
+import { Trophy, Coffee } from 'lucide-react';
 import { getAvatarColor } from '../../utils';
 import { GroupedCartItem } from '../../types';
 
@@ -163,14 +163,15 @@ const RouletteResult = ({
         </div>
       )}
 
-      {/* 다시하기 버튼 */}
-      <button
-        onClick={onReset}
-        className="flex items-center justify-center gap-2 mx-auto px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition"
-      >
-        <RotateCcw size={18} />
-        닫기
-      </button>
+      {/* 버튼 영역 */}
+      <div className="flex flex-col gap-2 items-center">
+        <button
+          onClick={onReset}
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition"
+        >
+          닫기
+        </button>
+      </div>
     </div>
   );
 };
