@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Play, Users, Shuffle } from 'lucide-react';
+import { X, Play, Users, Shuffle, MessageCircle } from 'lucide-react';
 import { RouletteGameState, CartItem, GroupedCartItem, HistoryItem, RouletteHistory } from '../../types';
 import { Roulette } from './roulette';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../../utils';
 import RouletteResult from './RouletteResult';
+import RouletteChat from './RouletteChat';
 
 interface RouletteModalProps {
   isOpen: boolean;
@@ -70,6 +71,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [localFinished, setLocalFinished] = useState(false);
   const [historySaved, setHistorySaved] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // 장바구니 캐시 (게임 시작 시 저장, 결과 화면에서 사용)
   const [cachedCart, setCachedCart] = useState<CartItem[]>([]);
@@ -496,6 +498,32 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* 채팅 패널 (ready/playing 상태에서만) */}
+          {(status === 'ready' || status === 'playing') && (
+            <>
+              {/* 채팅 토글 버튼 */}
+              <button
+                onClick={() => setIsChatOpen(!isChatOpen)}
+                className={`absolute bottom-4 right-4 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all z-10 ${
+                  isChatOpen ? 'bg-gray-600 text-white' : 'bg-primary text-white hover:bg-primary-dark'
+                }`}
+              >
+                {isChatOpen ? <X size={20} /> : <MessageCircle size={20} />}
+              </button>
+
+              {/* 채팅 패널 */}
+              {isChatOpen && (
+                <div className="absolute bottom-20 right-4 w-72 h-80 z-10 shadow-2xl rounded-xl overflow-hidden">
+                  <RouletteChat
+                    groupId={groupId}
+                    messages={gameState?.chatMessages || []}
+                    isActive={status === 'ready' || status === 'playing'}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </>
