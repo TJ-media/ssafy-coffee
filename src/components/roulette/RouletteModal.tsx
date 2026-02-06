@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Play, Users, Shuffle, MessageCircle } from 'lucide-react';
+import { X, Play, Users, Shuffle } from 'lucide-react';
 import { RouletteGameState, CartItem, GroupedCartItem, HistoryItem, RouletteHistory } from '../../types';
 import { Roulette } from './roulette';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
@@ -71,7 +71,6 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [localFinished, setLocalFinished] = useState(false);
   const [historySaved, setHistorySaved] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // 장바구니 캐시 (게임 시작 시 저장, 결과 화면에서 사용)
   const [cachedCart, setCachedCart] = useState<CartItem[]>([]);
@@ -83,6 +82,8 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 
   // 참가자 순서를 문자열로 변환 (배열 변경 감지용)
   const participantsKey = gameState?.participants?.join(',') || '';
+  // marbleCounts 변경 감지용 (객체 참조 변경 방지)
+  const marbleCountsKey = JSON.stringify(marbleCounts);
 
   // 게임 시작 시 장바구니 캐시 (장바구니가 비워져도 결과 화면에서 사용)
   useEffect(() => {
@@ -232,7 +233,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
     rouletteInstance.current.setMarbles(expanded, gameState.seed);
     setLocalFinished(false);
     setIsPlaying(false);
-  }, [isRouletteReady, participantsKey, gameState?.seed, marbleCounts]);
+  }, [isRouletteReady, participantsKey, gameState?.seed, marbleCountsKey]);
 
   // 카운트다운 처리
   useEffect(() => {
@@ -368,13 +369,15 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
           </div>
 
           {/* 메인 컨텐츠 */}
-          <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden">
-            <div className="flex-1 relative">
-              {/* Canvas (모든 참가자) */}
-              <canvas
-                ref={canvasRef}
-                className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}
-              ></canvas>
+          <div className="flex-1 flex p-2 min-h-0 overflow-hidden gap-2">
+            {/* 게임 영역 */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex-1 relative">
+                {/* Canvas (모든 참가자) */}
+                <canvas
+                  ref={canvasRef}
+                  className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}
+                ></canvas>
 
               {/* 로딩 화면 */}
               {!isRouletteReady && (
@@ -480,50 +483,36 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
               )}
             </div>
 
-            {/* 하단 상태 */}
-            <div className="py-2 text-center shrink-0">
-              {status === 'waiting' && (
-                <button
-                  onClick={onClose}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
-                >
-                  <X size={16} />
-                  대기실 나가기
-                </button>
-              )}
-              {status === 'playing' && (
-                <p className="text-gray-400 text-sm">
-                  🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!
-                </p>
-              )}
+              {/* 하단 상태 */}
+              <div className="py-2 text-center shrink-0">
+                {status === 'waiting' && (
+                  <button
+                    onClick={onClose}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
+                  >
+                    <X size={16} />
+                    대기실 나가기
+                  </button>
+                )}
+                {status === 'playing' && (
+                  <p className="text-gray-400 text-sm">
+                    🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* 채팅 패널 (ready/playing 상태에서 항상 표시) */}
+            {(status === 'ready' || status === 'playing') && (
+              <div className="w-72 shrink-0 h-full">
+                <RouletteChat
+                  groupId={groupId}
+                  messages={gameState?.chatMessages || []}
+                  isActive={status === 'ready' || status === 'playing'}
+                />
+              </div>
+            )}
           </div>
-
-          {/* 채팅 패널 (ready/playing 상태에서만) */}
-          {(status === 'ready' || status === 'playing') && (
-            <>
-              {/* 채팅 토글 버튼 */}
-              <button
-                onClick={() => setIsChatOpen(!isChatOpen)}
-                className={`absolute bottom-4 right-4 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all z-10 ${
-                  isChatOpen ? 'bg-gray-600 text-white' : 'bg-primary text-white hover:bg-primary-dark'
-                }`}
-              >
-                {isChatOpen ? <X size={20} /> : <MessageCircle size={20} />}
-              </button>
-
-              {/* 채팅 패널 */}
-              {isChatOpen && (
-                <div className="absolute bottom-20 right-4 w-72 h-80 z-10 shadow-2xl rounded-xl overflow-hidden">
-                  <RouletteChat
-                    groupId={groupId}
-                    messages={gameState?.chatMessages || []}
-                    isActive={status === 'ready' || status === 'playing'}
-                  />
-                </div>
-              )}
-            </>
-          )}
         </div>
       </div>
     </>
