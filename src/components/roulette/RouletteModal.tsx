@@ -6,7 +6,6 @@ import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../../utils';
 import RouletteResult from './RouletteResult';
-import RouletteChat from './RouletteChat';
 
 interface RouletteModalProps {
   isOpen: boolean;
@@ -369,15 +368,13 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
           </div>
 
           {/* 메인 컨텐츠 */}
-          <div className="flex-1 flex p-2 min-h-0 overflow-hidden gap-2">
-            {/* 게임 영역 */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="flex-1 relative">
-                {/* Canvas (모든 참가자) */}
-                <canvas
-                  ref={canvasRef}
-                  className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}
-                ></canvas>
+          <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden">
+            <div className="flex-1 relative">
+              {/* Canvas (모든 참가자) */}
+              <canvas
+                ref={canvasRef}
+                className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}
+              ></canvas>
 
               {/* 로딩 화면 */}
               {!isRouletteReady && (
@@ -483,35 +480,23 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
               )}
             </div>
 
-              {/* 하단 상태 */}
-              <div className="py-2 text-center shrink-0">
-                {status === 'waiting' && (
-                  <button
-                    onClick={onClose}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
-                  >
-                    <X size={16} />
-                    대기실 나가기
-                  </button>
-                )}
-                {status === 'playing' && (
-                  <p className="text-gray-400 text-sm">
-                    🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!
-                  </p>
-                )}
-              </div>
+            {/* 하단 상태 */}
+            <div className="py-2 text-center shrink-0">
+              {status === 'waiting' && (
+                <button
+                  onClick={onClose}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"
+                >
+                  <X size={16} />
+                  대기실 나가기
+                </button>
+              )}
+              {status === 'playing' && (
+                <p className="text-gray-400 text-sm">
+                  🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!
+                </p>
+              )}
             </div>
-
-            {/* 채팅 패널 (ready/playing 상태에서 항상 표시) */}
-            {(status === 'ready' || status === 'playing') && (
-              <div className="w-72 shrink-0 h-full">
-                <RouletteChat
-                  groupId={groupId}
-                  messages={gameState?.chatMessages || []}
-                  isActive={status === 'ready' || status === 'playing'}
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>
