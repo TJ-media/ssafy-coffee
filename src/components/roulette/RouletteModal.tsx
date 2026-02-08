@@ -64,9 +64,10 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rouletteInstance = useRef<Roulette | null>(null);
+  const isMountedRef = useRef(true); // 언마운트 체크용
 
   const [isRouletteReady, setIsRouletteReady] = useState(false);
-  const [countdown, setCountdown] = useState<number>(0);
+  const [countdown, setCountdown] = useState<number | null>(null); // null = 카운트다운 시작 전
   const [isPlaying, setIsPlaying] = useState(false);
   const [localFinished, setLocalFinished] = useState(false);
   const [historySaved, setHistorySaved] = useState(false);
@@ -78,6 +79,14 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
   const userName = localStorage.getItem('ssafy_userName') || '익명';
   const isHost = gameState?.hostName === userName;
   const isWinner = gameState?.winner === userName;
+
+  // 컴포넌트 마운트/언마운트 추적
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // 참가자 순서를 문자열로 변환 (배열 변경 감지용)
   const participantsKey = gameState?.participants?.join(',') || '';
@@ -234,36 +243,43 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
     setIsPlaying(false);
   }, [isRouletteReady, participantsKey, gameState?.seed, marbleCountsKey]);
 
-  // 카운트다운 처리
+  // 카운트다운 처리 + 완료 시 게임 시작
   useEffect(() => {
-    if (status === 'ready') {
-      setCountdown(3);
-      const interval = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
+    if (status !== 'ready') {
+      // ready가 아니면 카운트다운 리셋
+      setCountdown(null);
+      return;
+    }
+
+    // 카운트다운 시작
+    setCountdown(3);
+
+    const interval = setInterval(() => {
+      if (!isMountedRef.current) {
+        clearInterval(interval);
+        return;
+      }
+
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+
+          // 호스트만 게임 시작 (카운트다운 완료 시)
+          if (isHost && isMountedRef.current) {
+            const groupRef = doc(db, 'groups', groupId);
+            updateDoc(groupRef, {
+              'rouletteGame.status': 'playing',
+            }).catch(console.error);
           }
-          return prev - 1;
-        });
-      }, 1000);
 
-      return () => clearInterval(interval);
-    }
-  }, [status]);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-  // 카운트다운 완료 시 게임 시작 (호스트만 - Firebase 상태 변경)
-  useEffect(() => {
-    if (status === 'ready' && countdown === 0 && isHost) {
-      const startGame = async () => {
-        const groupRef = doc(db, 'groups', groupId);
-        await updateDoc(groupRef, {
-          'rouletteGame.status': 'playing',
-        });
-      };
-      startGame();
-    }
-  }, [status, countdown, groupId, isHost]);
+    return () => clearInterval(interval);
+  }, [status, isHost, groupId]);
 
   // playing 상태가 되면 게임 시작 (모든 참가자 - 동시 시작)
   useEffect(() => {
@@ -281,10 +297,12 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 
   // Event listener for roulette 'goal' event (호스트만)
   useEffect(() => {
-    if (!isHost) return;
+    if (!isHost || !rouletteInstance.current) return;
+
+    const instance = rouletteInstance.current; // 클로저에 캡처
 
     const handleGoal = (event: Event) => {
-      if (localFinished) return;
+      if (!isMountedRef.current || localFinished) return;
 
       const customEvent = event as CustomEvent;
       const winnerName = customEvent.detail.winner;
@@ -292,28 +310,30 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
       setIsPlaying(false);
       setLocalFinished(true);
 
-      const updateRouletteState = async () => {
-        const groupRef = doc(db, 'groups', groupId);
-        await updateDoc(groupRef, {
-          'rouletteGame.status': 'finished',
-          'rouletteGame.winner': winnerName,
-        });
-        // 히스토리 저장
-        await saveRouletteHistory(winnerName);
-      };
-      updateRouletteState();
+      // 비동기 작업
+      (async () => {
+        try {
+          const groupRef = doc(db, 'groups', groupId);
+          await updateDoc(groupRef, {
+            'rouletteGame.status': 'finished',
+            'rouletteGame.winner': winnerName,
+          });
+          // 히스토리 저장
+          if (isMountedRef.current) {
+            await saveRouletteHistory(winnerName);
+          }
+        } catch (e) {
+          console.error('Failed to update game state:', e);
+        }
+      })();
     };
 
-    if (rouletteInstance.current) {
-      rouletteInstance.current.addEventListener('goal', handleGoal);
-    }
+    instance.addEventListener('goal', handleGoal);
 
     return () => {
-      if (rouletteInstance.current) {
-        rouletteInstance.current.removeEventListener('goal', handleGoal);
-      }
+      instance.removeEventListener('goal', handleGoal);
     };
-  }, [groupId, localFinished, isHost, cart, historySaved]);
+  }, [groupId, isHost, localFinished, historySaved, cachedCart, marbleCounts, gameState?.participants]);
 
   if (!isOpen) return null;
 
@@ -471,7 +491,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
               )}
 
               {/* 카운트다운 오버레이 (모든 참가자) */}
-              {status === 'ready' && countdown > 0 && (
+              {status === 'ready' && countdown !== null && countdown > 0 && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
                   <span className="text-[120px] font-bold text-white countdown-pop drop-shadow-lg">
                     {countdown}
