@@ -125,26 +125,34 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 
   const handleStartGame = async () => {
     if (!isHost) return;
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, {
-      'rouletteGame.status': 'ready',
-    });
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        'rouletteGame.status': 'ready',
+      });
+    } catch (e) {
+      console.error('Failed to start game:', e);
+    }
   };
 
   const handleShuffle = async () => {
     if (!isHost || !gameState?.participants) return;
 
-    const shuffled = [...gameState.participants];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
+    try {
+      const shuffled = [...gameState.participants];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
 
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, {
-      'rouletteGame.participants': shuffled,
-      'rouletteGame.seed': Date.now(),
-    });
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        'rouletteGame.participants': shuffled,
+        'rouletteGame.seed': Date.now(),
+      });
+    } catch (e) {
+      console.error('Failed to shuffle:', e);
+    }
   };
 
   // 룰렛 히스토리 저장 + 장바구니 비우기 + 공 개수 업데이트
@@ -222,7 +230,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 
     return () => {
       if (rouletteInstance.current) {
-        rouletteInstance.current.reset();
+        rouletteInstance.current.destroy(); // 리소스 정리 (애니메이션 프레임 취소 포함)
         rouletteInstance.current = null;
       }
       setIsRouletteReady(false);
