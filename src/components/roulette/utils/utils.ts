@@ -50,6 +50,11 @@ export function getSeed() {
   return globalSeed;
 }
 
+// 전역 시드 기반 랜덤 (결정론적 시뮬레이션용)
+export function getSeededRandom(): number {
+  return seededRandom();
+}
+
 export function shuffle<T>(originalArray: T[], seed?: number): T[] {
   const array = originalArray.slice();
   let currentIndex = array.length;

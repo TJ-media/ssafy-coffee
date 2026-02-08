@@ -46,6 +46,7 @@ const OrderPage = () => {
   const [rouletteGame, setRouletteGame] = useState<RouletteGameState | undefined>(undefined);
   const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
   const [marbleCounts, setMarbleCounts] = useState<{ [userName: string]: number }>({});
+  const [isResultDismissed, setIsResultDismissed] = useState<boolean>(false); // 결과 화면 개별 닫기용
   
   const prevCartRef = useRef<CartItem[]>([]); // 실시간 알림용
 
@@ -148,6 +149,15 @@ const OrderPage = () => {
     }
   };
 
+  // === 결과 화면 리셋 (새 게임 시작 시) ===
+  useEffect(() => {
+    const currentStatus = rouletteGame?.status || 'idle';
+    // 게임이 시작되면 결과 닫기 상태 리셋
+    if (currentStatus === 'waiting' || currentStatus === 'ready' || currentStatus === 'playing') {
+      setIsResultDismissed(false);
+    }
+  }, [rouletteGame?.status]);
+
   // === 룰렛 게임 시작/종료 로직 ===
   const handleStartRoulette = async () => {
     const rouletteParticipants = [...new Set(cart.map(item => item.userName))];
@@ -173,17 +183,27 @@ const OrderPage = () => {
     });
   };
 
-  const handleEndRoulette = async () => {
-    if (!groupId) return;
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, {
-      rouletteGame: {
-        status: 'idle',
-        participants: [],
-        seed: 0,
-        chatMessages: [], // 채팅 메시지 초기화
-      },
-    });
+  // 모달 닫기 (상태에 따라 다르게 동작)
+  const handleCloseRouletteModal = async () => {
+    const currentStatus = rouletteGame?.status || 'idle';
+
+    if (currentStatus === 'waiting') {
+      // 대기실에서 나가기 = 게임 초기화
+      if (!groupId) return;
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        rouletteGame: {
+          status: 'idle',
+          participants: [],
+          seed: 0,
+          chatMessages: [],
+        },
+      });
+    } else if (currentStatus === 'finished') {
+      // 결과 화면 개별 닫기
+      setIsResultDismissed(true);
+    }
+    // ready, playing 상태에서는 닫기 불가 (버튼 자체가 없음)
   };
   
   // === 핵심 로직: 장바구니 담기 (애니메이션 포함) ===
@@ -365,7 +385,9 @@ const OrderPage = () => {
 
   // 룰렛 게임 참여자 (장바구니에 담은 사람들)
   const rouletteParticipants = [...new Set(cart.map(item => item.userName))];
-  const isRouletteModalOpen = !!(rouletteGame?.status && rouletteGame.status !== 'idle');
+  // 모달 열림 여부: 게임 진행 중이면 열림, 결과 화면은 개별 닫기 가능
+  const rouletteStatus = rouletteGame?.status || 'idle';
+  const isRouletteModalOpen = rouletteStatus !== 'idle' && !(rouletteStatus === 'finished' && isResultDismissed);
 
 
   return (
@@ -381,7 +403,7 @@ const OrderPage = () => {
       />
       <RouletteModal
         isOpen={isRouletteModalOpen}
-        onClose={handleEndRoulette}
+        onClose={handleCloseRouletteModal}
         groupId={groupId || ''}
         participants={rouletteParticipants}
         gameState={rouletteGame}

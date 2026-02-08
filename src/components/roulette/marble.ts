@@ -1,5 +1,5 @@
 import { Skills, STUCK_DELAY, Themes } from './data/constants';
-import { rad } from './utils/utils';
+import { rad, getSeededRandom } from './utils/utils';
 import options from './options';
 import { VectorLike } from './types/VectorLike';
 import { Vector } from './utils/Vector';
@@ -65,7 +65,7 @@ export class Marble {
     this.physics = physics;
 
     this._maxCoolTime = 1000 + (1 - this.weight) * 4000;
-    this._coolTime = this._maxCoolTime * Math.random();
+    this._coolTime = this._maxCoolTime * getSeededRandom();
     this._skillRate = 0.2 * this.weight;
 
     const maxLine = Math.ceil(max / 10);
@@ -115,7 +115,7 @@ export class Marble {
 
     if (this._coolTime <= 0) {
       this.skill =
-        Math.random() < this._skillRate ? Skills.Impact : Skills.None;
+        getSeededRandom() < this._skillRate ? Skills.Impact : Skills.None;
       this._coolTime = this._maxCoolTime;
     }
   }

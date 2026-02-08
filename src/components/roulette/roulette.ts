@@ -2,7 +2,7 @@ import { Marble } from './marble';
 import { initialZoom, Skills, Themes, zoomThreshold } from './data/constants';
 import { ParticleManager } from './particleManager';
 import { StageDef, stages } from './data/maps';
-import { parseName, shuffle } from './utils/utils';
+import { parseName, shuffle, setSeed } from './utils/utils';
 import { Camera } from './camera';
 import { RouletteRenderer } from './rouletteRenderer';
 import { SkillEffect } from './skillEffect';
@@ -385,6 +385,13 @@ export class Roulette extends EventTarget {
 
   public setMarbles(names: string[], seed?: number) {
     this.reset();
+
+    // 시드 설정 (결정론적 시뮬레이션)
+    if (seed !== undefined) {
+      setSeed(seed);  // 전역 시드 설정 (marble.ts에서 사용)
+      this.physics.setSeed(seed);  // 물리 엔진 시드 설정
+    }
+
     const arr = names.slice();
 
     let maxWeight = -Infinity;
