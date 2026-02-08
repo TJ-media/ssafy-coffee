@@ -39,6 +39,10 @@ export class Roulette extends EventTarget {
   private _timeScale = 1;
   private _speed = 1;
 
+  // 고정 프레임 동기화용
+  private _gameStartTime: number = 0;
+  private _executedSteps: number = 0;
+
   private _winners: Marble[] = [];
   private _particleManager = new ParticleManager();
   private _stage: StageDef | null = null;
@@ -108,33 +112,59 @@ export class Roulette extends EventTarget {
     if (!this._lastTime) this._lastTime = Date.now();
     const currentTime = Date.now();
 
-    this._elapsed += (currentTime - this._lastTime) * this._speed * this.fastForwarder.speed;
-    if (this._elapsed > 100) {
-      this._elapsed %= 100;
-    }
-    this._lastTime = currentTime;
+    // 게임 실행 중이면 고정 프레임 방식 (디바이스 간 동기화)
+    if (this._isRunning && !this._isSpectator) {
+      // 게임 시작 후 경과 시간 (ms)
+      const elapsedSinceStart = (currentTime - this._gameStartTime) * this._speed * this.fastForwarder.speed;
+      // 목표 step 수
+      const targetSteps = Math.floor(elapsedSinceStart / this._updateInterval);
 
-    const interval = (this._updateInterval / 1000) * this._timeScale;
+      // 고정 interval (동기화를 위해 timeScale 미적용)
+      const interval = this._updateInterval / 1000;
 
-    // 스펙테이터 모드가 아닐 때만 물리 시뮬레이션 실행
-    if (!this._isSpectator) {
-      while (this._elapsed >= this._updateInterval) {
+      // 한 프레임당 최대 step 수 제한 (렉 방지)
+      const maxStepsPerFrame = 20;
+      let stepsThisFrame = 0;
+
+      while (this._executedSteps < targetSteps && stepsThisFrame < maxStepsPerFrame) {
         this.physics.step(interval);
         this._updateMarbles(this._updateInterval);
         this._particleManager.update(this._updateInterval);
         this._updateEffects(this._updateInterval);
-        this._elapsed -= this._updateInterval;
         this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+        this._executedSteps++;
+        stepsThisFrame++;
       }
     } else {
-      // 스펙테이터 모드: 파티클과 이펙트만 업데이트
-      while (this._elapsed >= this._updateInterval) {
-        this._particleManager.update(this._updateInterval);
-        this._updateEffects(this._updateInterval);
-        this._elapsed -= this._updateInterval;
-        this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+      // 게임 시작 전 또는 스펙테이터 모드: 기존 방식
+      this._elapsed += (currentTime - this._lastTime) * this._speed * this.fastForwarder.speed;
+      if (this._elapsed > 100) {
+        this._elapsed %= 100;
+      }
+
+      const interval = (this._updateInterval / 1000) * this._timeScale;
+
+      if (!this._isSpectator) {
+        while (this._elapsed >= this._updateInterval) {
+          this.physics.step(interval);
+          this._updateMarbles(this._updateInterval);
+          this._particleManager.update(this._updateInterval);
+          this._updateEffects(this._updateInterval);
+          this._elapsed -= this._updateInterval;
+          this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+        }
+      } else {
+        // 스펙테이터 모드: 파티클과 이펙트만 업데이트
+        while (this._elapsed >= this._updateInterval) {
+          this._particleManager.update(this._updateInterval);
+          this._updateEffects(this._updateInterval);
+          this._elapsed -= this._updateInterval;
+          this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+        }
       }
     }
+
+    this._lastTime = currentTime;
 
     if (this._marbles.length > 1) {
       this._marbles.sort((a, b) => b.y - a.y);
@@ -340,6 +370,10 @@ export class Roulette extends EventTarget {
 
   public start() {
     this._isRunning = true;
+    // 고정 프레임 동기화: 게임 시작 시간 기록
+    this._gameStartTime = Date.now();
+    this._executedSteps = 0;
+
     // setWinningRank로 미리 설정하지 않았으면 (-1) options에서 가져옴
     if (this._winnerRank < 0) {
       this._winnerRank = options.winningRank;
@@ -455,6 +489,8 @@ export class Roulette extends EventTarget {
     this._loadMap();
     this._goalDist = Infinity;
     this._winnerRank = -1; // 다음 게임을 위해 초기화
+    this._gameStartTime = 0;
+    this._executedSteps = 0;
   }
 
   public getCount() {
