@@ -206,21 +206,48 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory = [], groupId 
 
                     <div className="space-y-2 mb-3">
                       {item.items.map((orderItem, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-text-primary">{orderItem.menuName}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
-                              orderItem.option === 'ICE' ? 'bg-blue-100 text-blue-600' :
-                              orderItem.option === 'HOT' ? 'bg-red-100 text-red-600' :
-                              'bg-gray-200 text-gray-600'
-                            }`}>
-                              {orderItem.option === 'ONLY' ? '-' : orderItem.option}
+                        <div key={idx} className="bg-white/50 rounded-lg p-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-text-primary font-medium">{orderItem.menuName}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
+                                orderItem.option === 'ICE' ? 'bg-blue-100 text-blue-600' :
+                                orderItem.option === 'HOT' ? 'bg-red-100 text-red-600' :
+                                'bg-gray-200 text-gray-600'
+                              }`}>
+                                {orderItem.option === 'ONLY' ? '-' : orderItem.option}
+                              </span>
+                              <span className="text-text-secondary">x{orderItem.count}</span>
+                            </div>
+                            <span className="text-text-secondary">
+                              {(orderItem.price * orderItem.count).toLocaleString()}원
                             </span>
-                            <span className="text-text-secondary">x{orderItem.count}</span>
                           </div>
-                          <span className="text-text-secondary">
-                            {(orderItem.price * orderItem.count).toLocaleString()}원
-                          </span>
+                          {/* 주문자 표시 */}
+                          {orderItem.orderedBy && orderItem.orderedBy.length > 0 && (
+                            <div className="flex items-center gap-1.5 mt-1.5 pl-1">
+                              <span className="text-xs text-text-secondary">주문:</span>
+                              <div className="flex flex-wrap gap-1">
+                                {orderItem.orderedBy.map((name, nameIdx) => (
+                                  <div
+                                    key={nameIdx}
+                                    className="flex items-center gap-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded-full"
+                                  >
+                                    <div
+                                      className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold"
+                                      style={{
+                                        backgroundColor: getAvatarColor(name),
+                                        color: getTextContrastColor(),
+                                      }}
+                                    >
+                                      {name.slice(0, 1)}
+                                    </div>
+                                    <span className="text-text-secondary">{name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -308,41 +335,68 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory = [], groupId 
                     {isEditing ? (
                       <div className="space-y-2 mb-3">
                         {editingItems.map((orderItem, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded-lg">
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="text-text-primary">{orderItem.menuName}</span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
-                                orderItem.option === 'ICE' ? 'bg-blue-100 text-blue-600' :
-                                orderItem.option === 'HOT' ? 'bg-red-100 text-red-600' :
-                                'bg-gray-200 text-gray-600'
-                              }`}>
-                                {orderItem.option === 'ONLY' ? '-' : orderItem.option}
-                              </span>
+                          <div key={idx} className="bg-white p-2 rounded-lg">
+                            <div className="flex justify-between items-center text-sm">
+                              <div className="flex items-center gap-2 flex-1">
+                                <span className="text-text-primary">{orderItem.menuName}</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
+                                  orderItem.option === 'ICE' ? 'bg-blue-100 text-blue-600' :
+                                  orderItem.option === 'HOT' ? 'bg-red-100 text-red-600' :
+                                  'bg-gray-200 text-gray-600'
+                                }`}>
+                                  {orderItem.option === 'ONLY' ? '-' : orderItem.option}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => updateItemCount(idx, -1)}
+                                  className="p-1 bg-gray-100 hover:bg-gray-200 rounded transition"
+                                >
+                                  <Minus size={14} />
+                                </button>
+                                <span className="w-6 text-center font-bold">{orderItem.count}</span>
+                                <button
+                                  onClick={() => updateItemCount(idx, 1)}
+                                  className="p-1 bg-gray-100 hover:bg-gray-200 rounded transition"
+                                >
+                                  <Plus size={14} />
+                                </button>
+                                <span className="text-text-secondary w-16 text-right">
+                                  {(orderItem.price * orderItem.count).toLocaleString()}원
+                                </span>
+                                <button
+                                  onClick={() => removeItem(idx)}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded transition"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => updateItemCount(idx, -1)}
-                                className="p-1 bg-gray-100 hover:bg-gray-200 rounded transition"
-                              >
-                                <Minus size={14} />
-                              </button>
-                              <span className="w-6 text-center font-bold">{orderItem.count}</span>
-                              <button
-                                onClick={() => updateItemCount(idx, 1)}
-                                className="p-1 bg-gray-100 hover:bg-gray-200 rounded transition"
-                              >
-                                <Plus size={14} />
-                              </button>
-                              <span className="text-text-secondary w-16 text-right">
-                                {(orderItem.price * orderItem.count).toLocaleString()}원
-                              </span>
-                              <button
-                                onClick={() => removeItem(idx)}
-                                className="p-1 text-red-500 hover:bg-red-50 rounded transition"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
+                            {/* 주문자 표시 (편집 모드) */}
+                            {orderItem.orderedBy && orderItem.orderedBy.length > 0 && (
+                              <div className="flex items-center gap-1.5 mt-1.5 pl-1">
+                                <span className="text-xs text-text-secondary">주문:</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {orderItem.orderedBy.map((name, nameIdx) => (
+                                    <div
+                                      key={nameIdx}
+                                      className="flex items-center gap-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded-full"
+                                    >
+                                      <div
+                                        className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold"
+                                        style={{
+                                          backgroundColor: getAvatarColor(name),
+                                          color: getTextContrastColor(),
+                                        }}
+                                      >
+                                        {name.slice(0, 1)}
+                                      </div>
+                                      <span className="text-text-secondary">{name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
 
@@ -425,21 +479,48 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory = [], groupId 
                       /* 일반 표시 모드 */
                       <div className="space-y-2 mb-3">
                         {item.orderItems.map((orderItem, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="text-text-primary">{orderItem.menuName}</span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
-                                orderItem.option === 'ICE' ? 'bg-blue-100 text-blue-600' :
-                                orderItem.option === 'HOT' ? 'bg-red-100 text-red-600' :
-                                'bg-gray-200 text-gray-600'
-                              }`}>
-                                {orderItem.option === 'ONLY' ? '-' : orderItem.option}
+                          <div key={idx} className="bg-white/50 rounded-lg p-2">
+                            <div className="flex justify-between items-center text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="text-text-primary font-medium">{orderItem.menuName}</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
+                                  orderItem.option === 'ICE' ? 'bg-blue-100 text-blue-600' :
+                                  orderItem.option === 'HOT' ? 'bg-red-100 text-red-600' :
+                                  'bg-gray-200 text-gray-600'
+                                }`}>
+                                  {orderItem.option === 'ONLY' ? '-' : orderItem.option}
+                                </span>
+                                <span className="text-text-secondary">x{orderItem.count}</span>
+                              </div>
+                              <span className="text-text-secondary">
+                                {(orderItem.price * orderItem.count).toLocaleString()}원
                               </span>
-                              <span className="text-text-secondary">x{orderItem.count}</span>
                             </div>
-                            <span className="text-text-secondary">
-                              {(orderItem.price * orderItem.count).toLocaleString()}원
-                            </span>
+                            {/* 주문자 표시 */}
+                            {orderItem.orderedBy && orderItem.orderedBy.length > 0 && (
+                              <div className="flex items-center gap-1.5 mt-1.5 pl-1">
+                                <span className="text-xs text-text-secondary">주문:</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {orderItem.orderedBy.map((name, nameIdx) => (
+                                    <div
+                                      key={nameIdx}
+                                      className="flex items-center gap-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded-full"
+                                    >
+                                      <div
+                                        className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold"
+                                        style={{
+                                          backgroundColor: getAvatarColor(name),
+                                          color: getTextContrastColor(),
+                                        }}
+                                      >
+                                        {name.slice(0, 1)}
+                                      </div>
+                                      <span className="text-text-secondary">{name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
