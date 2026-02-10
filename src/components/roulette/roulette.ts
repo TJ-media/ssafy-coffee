@@ -43,6 +43,10 @@ export class Roulette extends EventTarget {
   private _gameStartTime: number = 0;
   private _executedSteps: number = 0;
 
+  // 애니메이션 프레임 정리용
+  private _animationFrameId: number = 0;
+  private _isDestroyed: boolean = false;
+
   private _winners: Marble[] = [];
   private _particleManager = new ParticleManager();
   private _stage: StageDef | null = null;
@@ -183,7 +187,11 @@ export class Roulette extends EventTarget {
     }
 
     this._render();
-    window.requestAnimationFrame(this._update);
+
+    // 파괴되지 않은 경우에만 다음 프레임 요청
+    if (!this._isDestroyed) {
+      this._animationFrameId = window.requestAnimationFrame(this._update);
+    }
   }
 
   private _updateMarbles(deltaTime: number) {
@@ -209,7 +217,7 @@ export class Roulette extends EventTarget {
             this._renderer.height,
           );
           setTimeout(() => {
-            this._recorder.stop();
+            this._recorder?.stop();
           }, 1000);
         } else if (
           this._isRunning &&
@@ -228,7 +236,7 @@ export class Roulette extends EventTarget {
             this._renderer.height,
           );
           setTimeout(() => {
-            this._recorder.stop();
+            this._recorder?.stop();
           }, 1000);
         }
         setTimeout(() => {
@@ -491,6 +499,18 @@ export class Roulette extends EventTarget {
     this._winnerRank = -1; // 다음 게임을 위해 초기화
     this._gameStartTime = 0;
     this._executedSteps = 0;
+    this._isRunning = false;
+  }
+
+  // 컴포넌트 언마운트 시 리소스 정리
+  public destroy() {
+    this._isDestroyed = true;
+    if (this._animationFrameId) {
+      window.cancelAnimationFrame(this._animationFrameId);
+      this._animationFrameId = 0;
+    }
+    this.clearMarbles();
+    this._clearMap();
   }
 
   public getCount() {

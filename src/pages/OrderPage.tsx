@@ -167,20 +167,25 @@ const OrderPage = () => {
     }
     if (!groupId) return;
 
-    const seed = Date.now();
-    const groupRef = doc(db, 'groups', groupId);
+    try {
+      const seed = Date.now();
+      const groupRef = doc(db, 'groups', groupId);
 
-    const newGameState: RouletteGameState = {
-      status: 'waiting', // 대기실로 이동 (시작 버튼을 눌러야 게임 시작)
-      participants: rouletteParticipants,
-      seed: seed,
-      startedAt: new Date(),
-      hostName: userName, // 게임을 연 사람이 호스트
-    };
+      const newGameState: RouletteGameState = {
+        status: 'waiting', // 대기실로 이동 (시작 버튼을 눌러야 게임 시작)
+        participants: rouletteParticipants,
+        seed: seed,
+        startedAt: new Date(),
+        hostName: userName, // 게임을 연 사람이 호스트
+      };
 
-    await updateDoc(groupRef, {
-      rouletteGame: newGameState,
-    });
+      await updateDoc(groupRef, {
+        rouletteGame: newGameState,
+      });
+    } catch (e) {
+      console.error('Failed to start roulette:', e);
+      addToast('룰렛 시작에 실패했어요', 'warning');
+    }
   };
 
   // 모달 닫기 (상태에 따라 다르게 동작)
@@ -190,15 +195,19 @@ const OrderPage = () => {
     if (currentStatus === 'waiting') {
       // 대기실에서 나가기 = 게임 초기화
       if (!groupId) return;
-      const groupRef = doc(db, 'groups', groupId);
-      await updateDoc(groupRef, {
-        rouletteGame: {
-          status: 'idle',
-          participants: [],
-          seed: 0,
-          chatMessages: [],
-        },
-      });
+      try {
+        const groupRef = doc(db, 'groups', groupId);
+        await updateDoc(groupRef, {
+          rouletteGame: {
+            status: 'idle',
+            participants: [],
+            seed: 0,
+            chatMessages: [],
+          },
+        });
+      } catch (e) {
+        console.error('Failed to close roulette modal:', e);
+      }
     } else if (currentStatus === 'finished') {
       // 결과 화면 개별 닫기
       setIsResultDismissed(true);
@@ -252,25 +261,33 @@ const OrderPage = () => {
       category: menu.categoryUpper
     };
 
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, {
-      cart: arrayUnion(newItem)
-    });
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, {
+        cart: arrayUnion(newItem)
+      });
+    } catch (e) {
+      console.error('Failed to add item to cart:', e);
+    }
   };
 
   // 장바구니 내부 + 버튼 (애니메이션 없음)
   const addByPlusButton = async (menuName: string, price: number, option: OptionType) => {
      if (!groupId || !userName) return;
-     const newItem: CartItem = {
-      id: Date.now(),
-      userName: userName,
-      menuName: menuName,
-      price: price,
-      option: option,
-      category: ''
-    };
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, { cart: arrayUnion(newItem) });
+     try {
+       const newItem: CartItem = {
+        id: Date.now(),
+        userName: userName,
+        menuName: menuName,
+        price: price,
+        option: option,
+        category: ''
+      };
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, { cart: arrayUnion(newItem) });
+    } catch (e) {
+      console.error('Failed to add item:', e);
+    }
   };
 
   // 직접 입력 메뉴 추가
@@ -286,21 +303,27 @@ const OrderPage = () => {
       return;
     }
 
-    const newItem: CartItem = {
-      id: Date.now(),
-      userName: userName,
-      menuName: customMenuName.trim(),
-      price: price,
-      option: option,
-      category: '직접입력'
-    };
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, { cart: arrayUnion(newItem) });
+    try {
+      const newItem: CartItem = {
+        id: Date.now(),
+        userName: userName,
+        menuName: customMenuName.trim(),
+        price: price,
+        option: option,
+        category: '직접입력'
+      };
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, { cart: arrayUnion(newItem) });
 
-    // 입력 필드 초기화
-    setCustomMenuName('');
-    setCustomMenuPrice('');
-    addToast(`${customMenuName} 추가됨!`, 'success');
+      // 입력 필드 초기화
+      const menuNameForToast = customMenuName;
+      setCustomMenuName('');
+      setCustomMenuPrice('');
+      addToast(`${menuNameForToast} 추가됨!`, 'success');
+    } catch (e) {
+      console.error('Failed to add custom menu:', e);
+      addToast('메뉴 추가에 실패했어요', 'warning');
+    }
   };
 
   const removeFromCart = async (menuName: string, option: OptionType) => {
@@ -309,45 +332,55 @@ const OrderPage = () => {
       item => item.menuName === menuName && item.option === option && item.userName === userName
     );
     if (!targetItem) {
-      alert('내가 담은 메뉴만 취소할 수 있습니다.');
+      addToast('내가 담은 메뉴만 취소할 수 있습니다.', 'warning');
       return;
     }
-    const newCart = cart.filter(item => item.id !== targetItem.id);
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, { cart: newCart });
+    try {
+      const newCart = cart.filter(item => item.id !== targetItem.id);
+      const groupRef = doc(db, 'groups', groupId);
+      await updateDoc(groupRef, { cart: newCart });
+    } catch (e) {
+      console.error('Failed to remove item:', e);
+      addToast('메뉴 삭제에 실패했어요', 'warning');
+    }
   };
 
   // 결제 완료 (히스토리 저장 포함)
   const clearCart = async () => {
     if (!groupId) return;
     if (confirm('정말 장바구니를 비우시겠습니까? (결제 완료 시 실행)')) {
-      const groupedItems = Object.values(groupedCart);
-      const participants = [...new Set(cart.map(item => item.userName))];
+      try {
+        const groupedItems = Object.values(groupedCart);
+        const participants = [...new Set(cart.map(item => item.userName))];
 
-      const historyItems: HistoryItem[] = groupedItems.map(item => ({
-        menuName: item.menuName,
-        option: item.option,
-        price: item.price,
-        count: item.count,
-        orderedBy: item.names
-      }));
+        const historyItems: HistoryItem[] = groupedItems.map(item => ({
+          menuName: item.menuName,
+          option: item.option,
+          price: item.price,
+          count: item.count,
+          orderedBy: item.names
+        }));
 
-      const newHistory: OrderHistory = {
-        id: `order-${Date.now()}`,
-        orderedAt: new Date(),
-        totalPrice,
-        totalItems: cart.length,
-        items: historyItems,
-        participants
-      };
+        const newHistory: OrderHistory = {
+          id: `order-${Date.now()}`,
+          orderedAt: new Date(),
+          totalPrice,
+          totalItems: cart.length,
+          items: historyItems,
+          participants
+        };
 
-      const groupRef = doc(db, 'groups', groupId);
-      await updateDoc(groupRef, {
-        cart: [],
-        history: arrayUnion(newHistory)
-      });
+        const groupRef = doc(db, 'groups', groupId);
+        await updateDoc(groupRef, {
+          cart: [],
+          history: arrayUnion(newHistory)
+        });
 
-      addToast('결제가 완료되었어요!', 'success');
+        addToast('결제가 완료되었어요!', 'success');
+      } catch (e) {
+        console.error('Failed to clear cart:', e);
+        addToast('결제 처리에 실패했어요', 'warning');
+      }
     }
   };
 

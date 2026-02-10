@@ -13,5 +13,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// Analytics 초기화 (사용 시 필요)
+getAnalytics(app);
 export const db = getFirestore(app);
