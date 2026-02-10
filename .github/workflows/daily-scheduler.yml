@@ -1,0 +1,29 @@
+name: Daily Coffee Report
+
+on:
+  schedule:
+    # UTC 기준 21:30 = 한국 시간 06:30
+    - cron: '30 21 * * *'
+  workflow_dispatch: # 수동 실행 버튼 (테스트용)
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 스크립트 실행에 필요한 라이브러리 설치 (firebase-admin 등)
+      - name: Install Dependencies
+        run: npm install firebase-admin axios dayjs
+
+      - name: Run Report Script
+        env:
+          # 위에서 등록한 Secret들을 환경변수로 주입
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
+        run: node scripts/daily-report.js
