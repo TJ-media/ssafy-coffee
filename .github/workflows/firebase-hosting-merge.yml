@@ -26,18 +26,3 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SSAFY_COFFEE_E7F3F }}
           channelId: live
           projectId: ssafy-coffee-e7f3f
-  deploy_functions:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Install Dependencies
-        run: cd functions && npm ci
-
-      - name: Deploy Functions
-        run: npx firebase-tools deploy --only functions --token ${{ secrets.FIREBASE_TOKEN }} --non-interactive
