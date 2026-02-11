@@ -118,3 +118,31 @@ body {
 .pinball-result-enter {
   animation: pinball-result-enter 0.5s ease-out forwards;
 }
+
+/* 로딩 화면 스타일 */
+.splash-container {
+  /* 화면 전체를 덮고, 가장 위에 올라오도록 설정 */
+  @apply fixed inset-0 flex items-center justify-center bg-white z-50;
+  /* React가 준비되면 부드럽게 사라지는 효과 */
+  transition: opacity 0.5s ease-out, visibility 0.5s;
+}
+
+/* 로딩이 끝나서 숨겨져야 할 때 붙는 클래스 */
+.splash-container.hidden-splash {
+  @apply opacity-0 invisible;
+}
+
+.splash-content {
+  @apply text-center flex flex-col items-center;
+}
+
+.splash-logo {
+  /* 로고 크기 및 그림자 설정 */
+  @apply w-96 h-96 mb-4 drop-shadow-md;
+}
+
+.splash-text {
+  /* 텍스트 스타일 및 등장 애니메이션 */
+  @apply text-lg font-bold text-text-primary animate-slide-up;
+  animation-delay: 0.2s; /* 로고보다 조금 늦게 나옴 */
+}

@@ -1,13 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/nugucard.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/nugucard.png">
+    <link rel="apple-touch-icon" href="/nugucard.png">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ssafy-coffee</title>
+    <meta name="theme-color" content="#FCEB69"> <title>누구카두</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+  <body>
+  <div id="splash-screen" class="splash-container">
+    <div class="splash-content">
+      <img src="/nugucard.png" alt="로고" class="splash-logo animate-bounce-in">
+      <p class="splash-text">오늘 커피는 누구카두로? 🤔</p>
+    </div>
+  </div>
+  <div id="root"></div> <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
