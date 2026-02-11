@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { OrderHistory, RouletteHistory, HistoryItem } from '../types';
-import { X, Calendar, Coffee, Plus, Trash2, Pencil, Check } from 'lucide-react'; // Check 아이콘 추가
+import { X, Calendar, Coffee, Plus, Trash2, Pencil, Check } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../utils';
 import dayjs from 'dayjs';
 
@@ -23,7 +23,6 @@ interface Props {
 const HistoryModal = ({
                         isOpen, onClose, history, rouletteHistory, userName, onAddMode, onDeleteItem
                       }: Props) => {
-  // 삭제 대상 선택 모달 상태
   const [deleteTarget, setDeleteTarget] = useState<{
     historyId: string;
     type: 'normal' | 'roulette';
@@ -32,12 +31,10 @@ const HistoryModal = ({
     menuName: string;
   } | null>(null);
 
-  // 👇 [NEW] 현재 수정 중인 히스토리 ID (하나만 수정 가능)
   const [editingId, setEditingId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  // 정렬: 최신 날짜가 먼저 오도록 (내림차순)
   const allHistory = [
     ...history.map(h => ({ ...h, type: 'normal' as const })),
     ...rouletteHistory.map(h => ({ ...h, type: 'roulette' as const }))
@@ -78,8 +75,8 @@ const HistoryModal = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
-        <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl max-h-[85vh] flex flex-col relative z-10 animate-fade-in-up">
-          {/* 헤더 */}
+        {/* 👇 [수정] animate-slide-up 클래스 적용 (장바구니와 동일한 애니메이션) */}
+        <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl max-h-[85vh] flex flex-col relative z-10 animate-slide-up">
           <div className="p-5 border-b flex justify-between items-center shrink-0">
             <div>
               <h2 className="text-xl font-bold flex items-center gap-2">
@@ -95,7 +92,6 @@ const HistoryModal = ({
             </button>
           </div>
 
-          {/* 리스트 */}
           <div className="overflow-y-auto p-5 space-y-6 custom-scrollbar">
             {allHistory.length === 0 ? (
                 <div className="text-center py-10 text-text-secondary">
@@ -112,13 +108,10 @@ const HistoryModal = ({
                   const isPayer = isRoulette && winner === userName;
                   const items = isRoulette ? (h as RouletteHistory).orderItems : (h as OrderHistory).items;
 
-                  // 👇 현재 카드가 수정 중인지 확인
                   const isEditing = editingId === h.id;
 
                   return (
                       <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all duration-300 ${isEditing ? 'border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]' : 'border-gray-200'}`}>
-
-                        {/* 카드 헤더 */}
                         <div className="flex justify-between items-start mb-4 pb-3 border-b border-dashed">
                           <div>
                       <span className={`text-[10px] font-bold px-2 py-1 rounded-full mb-2 inline-block ${isRoulette ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
@@ -137,7 +130,6 @@ const HistoryModal = ({
                                 </div>
                             )}
 
-                            {/* 👇 [NEW] 개별 수정 토글 버튼 */}
                             <button
                                 onClick={() => setEditingId(isEditing ? null : h.id)}
                                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isEditing ? 'bg-primary text-white shadow-md rotate-0' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
@@ -148,7 +140,6 @@ const HistoryModal = ({
                           </div>
                         </div>
 
-                        {/* 메뉴 목록 */}
                         <div className="space-y-3">
                           {items.map((item, idx) => {
                             const isMyItem = item.orderedBy.includes(userName);
@@ -177,8 +168,6 @@ const HistoryModal = ({
 
                                   <div className="flex items-center gap-3">
                                     <span className="text-sm font-bold text-text-primary">{(item.price * item.count).toLocaleString()}원</span>
-
-                                    {/* 수정 모드일 때만 삭제 버튼 표시 */}
                                     {isEditing && canEdit && (
                                         <button
                                             onClick={() => handleDeleteClick(h, h.type, item, idx)}
@@ -198,7 +187,6 @@ const HistoryModal = ({
                           <span className="font-bold text-lg text-primary">{h.totalPrice.toLocaleString()}원</span>
                         </div>
 
-                        {/* 수정 모드일 때만 추가 버튼 표시 */}
                         {isEditing && (
                             <button
                                 onClick={() => onAddMode(h.id, h.type)}

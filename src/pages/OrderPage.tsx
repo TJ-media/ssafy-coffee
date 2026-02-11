@@ -193,29 +193,22 @@ const OrderPage = () => {
     }
   };
 
-// 히스토리 수정 관련 로직
   const enableHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
-    // 👇 1. 현재 메모리에 있는 히스토리 목록에서 해당 주문 건을 찾습니다.
     const isNormal = type === 'normal';
     const targetList = isNormal ? history : rouletteHistory;
     const targetObj = targetList.find(h => h.id === historyId);
 
-    // 👇 2. 아이템들의 수량을 합산합니다.
     let currentCount = 0;
     if (targetObj) {
-      // 타입에 따라 items 또는 orderItems 필드를 사용
       // @ts-ignore
       const items = isNormal ? targetObj.items : targetObj.orderItems;
-      if (items) {
-        currentCount = items.reduce((sum: number, i: HistoryItem) => sum + i.count, 0);
-      }
+      currentCount = items ? items.reduce((sum: number, i: HistoryItem) => sum + i.count, 0) : 0;
     }
 
-    // 👇 3. 초기값으로 0이 아닌 계산된 currentCount를 넣어줍니다.
     setEditingHistoryInfo({
       id: historyId,
       type,
-      count: currentCount, // 여기가 핵심 변경 사항입니다!
+      count: currentCount,
       animationKey: Date.now()
     });
 
@@ -536,7 +529,6 @@ const OrderPage = () => {
             />
         ))}
         <style>{`
-        /* 장바구니 담기 애니메이션 (기존 유지) */
         @keyframes flyToCart {
           0% { transform: translate(0, 0) scale(1); opacity: 1; }
           80% { opacity: 1; }
@@ -546,25 +538,18 @@ const OrderPage = () => {
           animation: flyToCart 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         
-        /* 👇 [수정] 모달 → FAB 물리 엔진 애니메이션 (0.7초) */
         @keyframes flyFromCenter {
           0% { 
-            /* 화면 중앙에서 시작 (빠른 속도로 출발) */
             transform: translate(-45vw, -35vh) scale(0.3); 
             opacity: 0; 
-            /* 올라갈 때는 점점 느려짐 (Deceleration) */
             animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
           }
           50% {
-            /* 최고점 도달 (잠깐 멈춘 듯한 느낌 - Hang time) */
-            /* 화면 위쪽(-65vh)까지 높게 솟구침 */
-            transform: translate(-15vw, -55vh) scale(1.15);
+            transform: translate(-20vw, -65vh) scale(1.15);
             opacity: 1;
-            /* 내려올 때는 점점 빨라짐 (Acceleration) */
             animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53);
           }
           100% { 
-            /* 바닥(FAB 위치)에 쿵 하고 떨어짐 */
             transform: translate(0, 0) scale(1); 
             opacity: 1; 
           }
@@ -724,7 +709,8 @@ const OrderPage = () => {
 
         {!isCartOpen && (
             <button
-                key={editingHistoryInfo ? `edit-${editingHistoryInfo.animationKey}` : 'cart-fab'}
+                // Cart 모드일 때는 고정된 키('cart-fab')를 사용
+                key={editingHistoryInfo ? `edit-${editingHistoryInfo.animationKey}` : `cart-fab`}
                 id={editingHistoryInfo ? 'history-fab' : 'cart-fab'}
                 ref={cartFabRef}
                 onClick={() => {
@@ -734,8 +720,12 @@ const OrderPage = () => {
                     setIsCartOpen(true);
                   }
                 }}
+                // 👇 [핵심 수정] 애니메이션 클래스 분기 처리
                 className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform hover:scale-110 active:scale-95 
-            ${editingHistoryInfo ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center' : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
+            ${editingHistoryInfo
+                    ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'  // 1. 수정 모드: 날아오는 효과
+                    : 'bg-primary hover:bg-primary-dark animate-bounce-in'          // 2. 장바구니: 쫀득하게 팝업 효과
+                }`}
             >
               <div className="relative">
                 {editingHistoryInfo ? <Pencil size={28} /> : <ShoppingCart size={28} />}
@@ -759,6 +749,7 @@ const OrderPage = () => {
                 onRemove={removeFromCart}
                 onAdd={addByPlusButton}
                 onClear={clearCart}
+                // 👇 [수정] 닫힐 때 키 업데이트 로직 삭제 (컴포넌트 언마운트로 충분함)
                 onClose={() => setIsCartOpen(false)}
                 onEdit={() => {}}
             />
