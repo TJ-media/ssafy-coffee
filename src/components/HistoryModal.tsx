@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { OrderHistory, RouletteHistory, HistoryItem } from '../types';
-import { X, Calendar, Coffee, Plus, Trash2, Pencil } from 'lucide-react'; // Pencil 추가, UserMinus 삭제
+import { X, Calendar, Coffee, Plus, Trash2, Pencil, Check } from 'lucide-react'; // Check 아이콘 추가
 import { getAvatarColor, getTextContrastColor } from '../utils';
 import dayjs from 'dayjs';
 
@@ -32,8 +32,8 @@ const HistoryModal = ({
     menuName: string;
   } | null>(null);
 
-  // 👇 [NEW] 히스토리 수정 모드 토글 상태
-  const [isEditMode, setIsEditMode] = useState(false);
+  // 👇 [NEW] 현재 수정 중인 히스토리 ID (하나만 수정 가능)
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -44,15 +44,11 @@ const HistoryModal = ({
   ].sort((a, b) => {
     const dateA = a.type === 'normal' ? (a as OrderHistory).orderedAt : (a as RouletteHistory).playedAt;
     const dateB = b.type === 'normal' ? (b as OrderHistory).orderedAt : (b as RouletteHistory).playedAt;
-
-    // Date 객체 변환 후 비교
     const timeA = dateA?.toDate ? dateA.toDate().getTime() : new Date(dateA).getTime();
     const timeB = dateB?.toDate ? dateB.toDate().getTime() : new Date(dateB).getTime();
-
-    return timeB - timeA; // 내림차순 (최신순)
+    return timeB - timeA;
   });
 
-  // 삭제 버튼 핸들러
   const handleDeleteClick = (
       hItem: OrderHistory | RouletteHistory,
       type: 'normal' | 'roulette',
@@ -63,26 +59,18 @@ const HistoryModal = ({
     const winner = isRoulette ? (hItem as RouletteHistory).winner : '';
     const isPayer = isRoulette && winner === userName;
 
-    // 결제자이면서 여러 명이 시킨 메뉴인 경우 -> 선택 모달 띄우기
     if (isPayer && item.orderedBy.length > 1) {
       setDeleteTarget({
-        historyId: hItem.id,
-        type,
-        itemIndex: idx,
-        participants: item.orderedBy,
-        menuName: item.menuName
+        historyId: hItem.id, type, itemIndex: idx, participants: item.orderedBy, menuName: item.menuName
       });
       return;
     }
-
-    // 그 외(내 거 삭제 or 1명짜리 삭제) -> 즉시 삭제
     const targetUser = isPayer ? undefined : userName;
     onDeleteItem(hItem.id, type, idx, targetUser);
   };
 
-  // 모달 닫을 때 에디트 모드도 초기화
   const handleClose = () => {
-    setIsEditMode(false);
+    setEditingId(null);
     onClose();
   };
 
@@ -99,22 +87,12 @@ const HistoryModal = ({
                 주문 히스토리
               </h2>
               <p className="text-xs text-text-secondary mt-1">
-                {isEditMode ? '수정 모드 활성화됨' : '우측 연필 버튼을 눌러 수정하세요'}
+                연필 버튼을 눌러 내역을 수정하세요
               </p>
             </div>
-            <div className="flex gap-2">
-              {/* 👇 수정 모드 토글 버튼 (연필) */}
-              <button
-                  onClick={() => setIsEditMode(!isEditMode)}
-                  className={`p-2 rounded-full transition-colors ${isEditMode ? 'bg-primary text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                  title="수정 모드"
-              >
-                <Pencil size={20} />
-              </button>
-              <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <X size={24} className="text-gray-400" />
-              </button>
-            </div>
+            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X size={24} className="text-gray-400" />
+            </button>
           </div>
 
           {/* 리스트 */}
@@ -134,8 +112,12 @@ const HistoryModal = ({
                   const isPayer = isRoulette && winner === userName;
                   const items = isRoulette ? (h as RouletteHistory).orderItems : (h as OrderHistory).items;
 
+                  // 👇 현재 카드가 수정 중인지 확인
+                  const isEditing = editingId === h.id;
+
                   return (
-                      <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all ${isEditMode ? 'border-primary ring-1 ring-primary/20' : 'border-gray-200'}`}>
+                      <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all duration-300 ${isEditing ? 'border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]' : 'border-gray-200'}`}>
+
                         {/* 카드 헤더 */}
                         <div className="flex justify-between items-start mb-4 pb-3 border-b border-dashed">
                           <div>
@@ -146,19 +128,30 @@ const HistoryModal = ({
                               {dayjs(dateObj).format('YYYY.MM.DD HH:mm')}
                             </div>
                           </div>
-                          {isRoulette && (
-                              <div className="text-right">
-                                <div className="text-xs text-text-secondary mb-1">당첨자</div>
-                                <div className="font-bold text-primary">{winner}</div>
-                              </div>
-                          )}
+
+                          <div className="flex items-center gap-2">
+                            {isRoulette && (
+                                <div className="text-right mr-1">
+                                  <div className="text-[10px] text-text-secondary">당첨자</div>
+                                  <div className="font-bold text-primary text-sm">{winner}</div>
+                                </div>
+                            )}
+
+                            {/* 👇 [NEW] 개별 수정 토글 버튼 */}
+                            <button
+                                onClick={() => setEditingId(isEditing ? null : h.id)}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isEditing ? 'bg-primary text-white shadow-md rotate-0' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                title={isEditing ? "수정 완료" : "수정하기"}
+                            >
+                              {isEditing ? <Check size={16} /> : <Pencil size={14} />}
+                            </button>
+                          </div>
                         </div>
 
                         {/* 메뉴 목록 */}
                         <div className="space-y-3">
                           {items.map((item, idx) => {
                             const isMyItem = item.orderedBy.includes(userName);
-                            // 수정 권한: 결제자이거나, 내 메뉴인 경우
                             const canEdit = isPayer || isMyItem;
 
                             return (
@@ -185,8 +178,8 @@ const HistoryModal = ({
                                   <div className="flex items-center gap-3">
                                     <span className="text-sm font-bold text-text-primary">{(item.price * item.count).toLocaleString()}원</span>
 
-                                    {/* 👇 [수정] 쓰레기통 아이콘으로 통일 & 에디트 모드일 때만 표시 */}
-                                    {isEditMode && canEdit && (
+                                    {/* 수정 모드일 때만 삭제 버튼 표시 */}
+                                    {isEditing && canEdit && (
                                         <button
                                             onClick={() => handleDeleteClick(h, h.type, item, idx)}
                                             className="w-7 h-7 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors animate-fade-in"
@@ -205,8 +198,8 @@ const HistoryModal = ({
                           <span className="font-bold text-lg text-primary">{h.totalPrice.toLocaleString()}원</span>
                         </div>
 
-                        {/* 👇 [수정] 메뉴 추가 버튼도 에디트 모드일 때만 표시 */}
-                        {isEditMode && (
+                        {/* 수정 모드일 때만 추가 버튼 표시 */}
+                        {isEditing && (
                             <button
                                 onClick={() => onAddMode(h.id, h.type)}
                                 className="w-full mt-4 py-3 bg-primary/10 text-primary rounded-xl font-bold text-sm hover:bg-primary/20 transition flex items-center justify-center gap-2 active:scale-95 animate-fade-in"
@@ -221,13 +214,11 @@ const HistoryModal = ({
           </div>
         </div>
 
-        {/* 아바타 선택 모달 (2명 이상일 때 삭제 대상 선택) */}
         {deleteTarget && (
             <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
               <div className="bg-white p-6 rounded-2xl shadow-xl w-64 animate-bounce-in">
                 <h3 className="text-center font-bold text-lg mb-2">누구 메뉴를 뺄까요?</h3>
                 <p className="text-center text-xs text-text-secondary mb-4">{deleteTarget.menuName}</p>
-
                 <div className="flex flex-wrap gap-3 justify-center">
                   {deleteTarget.participants.map((p, idx) => (
                       <button
@@ -250,7 +241,6 @@ const HistoryModal = ({
                       </button>
                   ))}
                 </div>
-
                 <button
                     onClick={() => setDeleteTarget(null)}
                     className="w-full mt-6 py-2 text-sm text-gray-400 hover:text-gray-600 underline"

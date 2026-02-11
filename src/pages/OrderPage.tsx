@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { MEGA_MENUS, CATEGORIES } from '../menuData';
-import { ShoppingCart, LogOut, Heart, Link, History, Target, Pencil } from 'lucide-react'; // 쓰지 않는 아이콘 제거
+import { ShoppingCart, LogOut, Heart, Link, History, Target, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CartItem, GroupData, Menu, OptionType, GroupedCartItem, ToastMessage, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory } from '../types';
 import { getAvatarColor, getTextContrastColor, getFavorites, addFavorite, removeFavorite, isFavorite } from '../utils';
@@ -45,6 +45,7 @@ const OrderPage = () => {
     id: string;
     type: 'normal' | 'roulette';
     count: number;
+    animationKey: number;
   } | null>(null);
 
   const prevCartRef = useRef<CartItem[]>([]);
@@ -192,10 +193,32 @@ const OrderPage = () => {
     }
   };
 
-
-  // 히스토리 수정 관련 로직
+// 히스토리 수정 관련 로직
   const enableHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
-    setEditingHistoryInfo({ id: historyId, type, count: 0 });
+    // 👇 1. 현재 메모리에 있는 히스토리 목록에서 해당 주문 건을 찾습니다.
+    const isNormal = type === 'normal';
+    const targetList = isNormal ? history : rouletteHistory;
+    const targetObj = targetList.find(h => h.id === historyId);
+
+    // 👇 2. 아이템들의 수량을 합산합니다.
+    let currentCount = 0;
+    if (targetObj) {
+      // 타입에 따라 items 또는 orderItems 필드를 사용
+      // @ts-ignore
+      const items = isNormal ? targetObj.items : targetObj.orderItems;
+      if (items) {
+        currentCount = items.reduce((sum: number, i: HistoryItem) => sum + i.count, 0);
+      }
+    }
+
+    // 👇 3. 초기값으로 0이 아닌 계산된 currentCount를 넣어줍니다.
+    setEditingHistoryInfo({
+      id: historyId,
+      type,
+      count: currentCount, // 여기가 핵심 변경 사항입니다!
+      animationKey: Date.now()
+    });
+
     setIsHistoryOpen(false);
     setIsCartOpen(false);
     addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
@@ -513,6 +536,7 @@ const OrderPage = () => {
             />
         ))}
         <style>{`
+        /* 장바구니 담기 애니메이션 (기존 유지) */
         @keyframes flyToCart {
           0% { transform: translate(0, 0) scale(1); opacity: 1; }
           80% { opacity: 1; }
@@ -520,6 +544,33 @@ const OrderPage = () => {
         }
         .flying-ball {
           animation: flyToCart 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        
+        /* 👇 [수정] 모달 → FAB 물리 엔진 애니메이션 (0.7초) */
+        @keyframes flyFromCenter {
+          0% { 
+            /* 화면 중앙에서 시작 (빠른 속도로 출발) */
+            transform: translate(-45vw, -35vh) scale(0.3); 
+            opacity: 0; 
+            /* 올라갈 때는 점점 느려짐 (Deceleration) */
+            animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          }
+          50% {
+            /* 최고점 도달 (잠깐 멈춘 듯한 느낌 - Hang time) */
+            /* 화면 위쪽(-65vh)까지 높게 솟구침 */
+            transform: translate(-15vw, -55vh) scale(1.15);
+            opacity: 1;
+            /* 내려올 때는 점점 빨라짐 (Acceleration) */
+            animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53);
+          }
+          100% { 
+            /* 바닥(FAB 위치)에 쿵 하고 떨어짐 */
+            transform: translate(0, 0) scale(1); 
+            opacity: 1; 
+          }
+        }
+        .animate-fly-from-center {
+          animation: flyFromCenter 0.7s forwards;
         }
       `}</style>
         {flyingItems.map(item => (
@@ -673,6 +724,7 @@ const OrderPage = () => {
 
         {!isCartOpen && (
             <button
+                key={editingHistoryInfo ? `edit-${editingHistoryInfo.animationKey}` : 'cart-fab'}
                 id={editingHistoryInfo ? 'history-fab' : 'cart-fab'}
                 ref={cartFabRef}
                 onClick={() => {
@@ -682,8 +734,8 @@ const OrderPage = () => {
                     setIsCartOpen(true);
                   }
                 }}
-                className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform hover:scale-110 active:scale-95 animate-bounce-in 
-            ${editingHistoryInfo ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-primary hover:bg-primary-dark'}`}
+                className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform hover:scale-110 active:scale-95 
+            ${editingHistoryInfo ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center' : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
             >
               <div className="relative">
                 {editingHistoryInfo ? <Pencil size={28} /> : <ShoppingCart size={28} />}

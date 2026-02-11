@@ -189,7 +189,7 @@ const LandingPage = () => {
         {/* 👇 디자인 수정된 헤더 영역 👇 */}
         <div className="mt-4 mb-6 text-center shrink-0 flex flex-col items-center justify-center">
           <img
-              src="/favicon.ico"
+              src="/nugucard.png"
               alt="누구카두 로고"
               // 이미지 사이즈를 w-44 (약 176px)로 조정하고, 그림자와 핏을 맞춤
               className="w-48 h-48 object-contain drop-shadow-md"
