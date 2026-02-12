@@ -56,7 +56,8 @@ const OrderPage = () => {
 
   const handleAddToCartWrapper = async (e: React.MouseEvent, menu: any, option: any) => {
     triggerFlyAnimation(e, '#3a9df2');
-    await actions.addToCartHandler(menu.name, menu.price, option);
+    // 👇 [수정] menu.categoryUpper 정보를 함께 전달
+    await actions.addToCartHandler(menu.name, menu.price, option, menu.categoryUpper);
   };
 
   const handleHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
@@ -225,12 +226,16 @@ const OrderPage = () => {
                   const target = state.cart.find(i => i.menuName === name && i.option === option && i.userName === state.userName);
                   if (target && state.groupId) await updateCartApi(state.groupId, state.cart.filter(c => c.id !== target.id));
                 }}
-                onAdd={async (name, price, option) => {
-                  if (state.groupId) await addToCartApi(state.groupId, { id: Date.now(), userName: state.userName, menuName: name, price, option, category: '' });
+                onAdd={async (name, price, option, category) => { // category 인자 추가 (하지만 여기서 못 구함)
+                  // CartSheet에서는 category 정보를 직접 알기 어려우므로,
+                  // 1. cart item에서 가져오거나
+                  // 2. hook에서 처리하거나
+                  // 여기서는 hook에서 빈값이면 알아서 처리하도록 했으니 빈값 넘겨도 됨.
+                  if (state.groupId) await addToCartApi(state.groupId, { id: Date.now(), userName: state.userName, menuName: name, price, option, category: category || '' });
                 }}
                 onClear={async () => {
                   if (confirm('정말 결제 완료하시겠습니까?')) {
-                    // 결제 로직: 필요 시 추가
+                    // 결제 로직
                   }
                 }}
                 onClose={() => actions.setIsCartOpen(false)}

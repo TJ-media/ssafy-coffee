@@ -17,7 +17,7 @@ const MarbleAdminModal = ({ isOpen, onClose, marbleCounts, groupId }: MarbleAdmi
 
   const updateMarbleCount = async (userName: string, newCount: number) => {
     if (newCount < 1) newCount = 1; // 최소 1개
-    if (newCount > 10) newCount = 10; // 최대 10개
+    if (newCount > 50) newCount = 50; // 최대 50개로 수정 (REQ-02 반영)
 
     try {
       const groupRef = doc(db, 'groups', groupId);
@@ -77,7 +77,7 @@ const MarbleAdminModal = ({ isOpen, onClose, marbleCounts, groupId }: MarbleAdmi
             ) : (
                 <>
                   <p className="text-sm text-text-secondary mb-4">
-                    공 개수가 많을수록 당첨(커피 사기) 확률이 높아져요
+                    공 개수가 많을수록 당첨(커피 사기) 확률이 높아져요 (최대 50개)
                   </p>
                   <div className="space-y-3">
                     {users.map((userName) => {
@@ -109,11 +109,14 @@ const MarbleAdminModal = ({ isOpen, onClose, marbleCounts, groupId }: MarbleAdmi
                                 <Minus size={16} />
                               </button>
                               <div className="w-12 text-center">
-                                <span className="text-xl font-bold text-primary">🎱 {count}</span>
+                                {/* 숫자가 커져도 레이아웃 유지되도록 텍스트 크기 조절 */}
+                                <span className={`font-bold text-primary ${count >= 10 ? 'text-lg' : 'text-xl'}`}>
+                                  {count}
+                                </span>
                               </div>
                               <button
                                   onClick={() => updateMarbleCount(userName, count + 1)}
-                                  disabled={count >= 10}
+                                  disabled={count >= 50}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 disabled:opacity-30 disabled:hover:bg-gray-200 rounded-lg transition"
                               >
                                 <Plus size={16} />
