@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History, Pencil, X, Settings, Key } from 'lucide-react';
-import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../utils';
-import { RouletteHistory, GroupData } from '../types';
+import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../shared/utils';
+import { RouletteHistory, GroupData } from '../shared/types';
 
 const AdminPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
