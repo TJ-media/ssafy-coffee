@@ -22,6 +22,7 @@ const OrderPage = () => {
   const cartSheetRef = useRef<HTMLDivElement>(null);
   const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
 
+  // 카테고리별 서브 메뉴 계산
   const subCategories = useMemo(() => {
     const menus = MEGA_MENUS.filter(m => m.categoryUpper === selectedCategory);
     const uniqueLowers = Array.from(new Set(menus.map(m => m.categoryLower)));
@@ -36,6 +37,7 @@ const OrderPage = () => {
     }
   };
 
+  // 장바구니 담기 애니메이션 (곡선 이동)
   const triggerFlyAnimation = (e: React.MouseEvent, color: string) => {
     const startX = e.clientX;
     const startY = e.clientY;
@@ -54,11 +56,13 @@ const OrderPage = () => {
     setTimeout(() => setFlyingItems(prev => prev.filter(i => i.id !== animId)), 600);
   };
 
+  // 메뉴 클릭 핸들러
   const handleAddToCartWrapper = async (e: React.MouseEvent, menu: any, option: any) => {
-    triggerFlyAnimation(e, '#3a9df2');
+    triggerFlyAnimation(e, '#3a9df2'); // 임시 색상 (필요시 getAvatarColor 사용)
     await actions.addToCartHandler(menu.name, menu.price, option);
   };
 
+  // 히스토리 모달 -> 메뉴 추가 모드 전환
   const handleHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
     const isNormal = type === 'normal';
     const targetList = isNormal ? state.history : state.rouletteHistory;
@@ -69,6 +73,8 @@ const OrderPage = () => {
       const items = isNormal ? targetObj.items : targetObj.orderItems;
       currentCount = items ? items.reduce((sum: number, i: any) => sum + i.count, 0) : 0;
     }
+
+    // 상태 업데이트 (animationKey 갱신으로 애니메이션 트리거)
     actions.setEditingHistoryInfo({
       id: historyId, type, count: currentCount, animationKey: Date.now()
     });
@@ -77,6 +83,7 @@ const OrderPage = () => {
     actions.addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
   };
 
+  // 히스토리 아이템 삭제
   const handleDeleteItem = async (historyId: string, type: 'normal'|'roulette', index: number, targetUser?: string) => {
     if (!state.groupId) return;
     const isNormal = type === 'normal';
@@ -115,6 +122,30 @@ const OrderPage = () => {
       <div className="h-full flex flex-col bg-background relative overflow-hidden">
         <Toast toasts={state.toasts} removeToast={actions.removeToast} />
 
+        {/* 👇 [복원] 모달 → FAB 물리 엔진 애니메이션 CSS 정의 */}
+        <style>{`
+          @keyframes flyFromCenter {
+            0% { 
+              transform: translate(-45vw, -35vh) scale(0.3); 
+              opacity: 0; 
+              animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+            50% {
+              /* 화면 위쪽까지 솟구침 */
+              transform: translate(-15vw, -55vh) scale(1.15);
+              opacity: 1;
+              animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53);
+            }
+            100% { 
+              transform: translate(0, 0) scale(1); 
+              opacity: 1; 
+            }
+          }
+          .animate-fly-from-center {
+            animation: flyFromCenter 0.7s forwards;
+          }
+        `}</style>
+
         <FlyingBall items={flyingItems} />
 
         <HistoryModal
@@ -129,9 +160,7 @@ const OrderPage = () => {
         />
 
         <RouletteModal
-            // 👇 [수정] 훅에서 계산된 isOpen 상태를 사용해야 닫기 버튼을 눌렀을 때 사라집니다.
             isOpen={state.isRouletteModalOpen}
-            // 👇 [수정] 빈 함수 대신 훅에서 가져온 닫기 핸들러를 연결했습니다.
             onClose={actions.handleCloseRoulette}
             groupId={state.groupId || ''}
             participants={state.rouletteGame?.participants || []}
@@ -150,9 +179,16 @@ const OrderPage = () => {
             onSelectSubCategory={setSelectedSubCategory}
             onCopyLink={() => { navigator.clipboard.writeText(window.location.href); actions.addToast('복사 완료'); }}
             onOpenHistory={() => actions.setIsHistoryOpen(true)}
-            onOpenPinball={() => { /* 룰렛 시작 트리거 필요하면 추가 */ }}
+            onOpenPinball={() => { /* 필요시 룰렛 시작 로직 */ }}
             onLogout={handleLogout}
         />
+
+        {/* 👇 [복원] 수정 모드 알림 배너 (OrderHeader 아래 배치) */}
+        {state.editingHistoryInfo && (
+            <div className="bg-primary text-white text-center py-2 text-sm font-bold animate-pulse shadow-md relative z-20">
+              ✨ 지난 주문 내역을 수정 중입니다 (메뉴를 터치하세요)
+            </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 pb-32 custom-scrollbar">
           <MenuGrid
@@ -166,15 +202,19 @@ const OrderPage = () => {
 
         {!state.isCartOpen && (
             <button
+                // 👇 [복원] animationKey를 사용하여 버튼이 새로 렌더링되도록 함 (애니메이션 리플레이)
+                key={state.editingHistoryInfo ? `edit-${state.editingHistoryInfo.animationKey}` : 'cart-fab'}
+
                 ref={cartFabRef}
                 onClick={() => {
                   if (state.editingHistoryInfo) actions.setIsHistoryOpen(true);
                   else actions.setIsCartOpen(true);
                 }}
+                // 👇 [복원] 수정 모드일 때 fly-from-center 애니메이션 클래스 적용
                 className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform active:scale-95 
-            ${state.editingHistoryInfo
-                    ? 'bg-indigo-500 animate-fly-from-center'
-                    : 'bg-primary animate-bounce-in'}`}
+                  ${state.editingHistoryInfo
+                    ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
+                    : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
             >
               <div className="relative">
                 {state.editingHistoryInfo ? <Pencil size={28}/> : <ShoppingCart size={28}/>}
@@ -203,9 +243,7 @@ const OrderPage = () => {
                 }}
                 onClear={async () => {
                   if (confirm('정말 결제 완료하시겠습니까?')) {
-                    // 결제 로직: History 객체 생성 부분은 너무 길어서 생략했지만
-                    // 필요시 기존 OrderPage의 clearCart 로직을 복사해서 여기에 넣으세요.
-                    // checkoutApi(state.groupId, newHistory);
+                    // 결제 로직: 필요 시 api/firebaseApi.ts의 checkoutApi 활용
                   }
                 }}
                 onClose={() => actions.setIsCartOpen(false)}
