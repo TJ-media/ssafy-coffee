@@ -9,6 +9,8 @@ import FlyingBall, { FlyingItem } from '../features/order/ui/FlyingBall';
 import CartSheet from '../features/order/ui/CartSheet';
 import HistoryModal from '../features/order/ui/HistoryModal';
 import RouletteModal from '../features/roulette/ui/RouletteModal';
+// 👇 경로 및 컴포넌트 이름 확인
+import SettingsModal from '../features/order/ui/SettingsModal';
 import Toast from '../shared/ui/Toast';
 import { updateHistoryApi, updateCartApi, addToCartApi } from '../features/order/api/firebaseApi';
 
@@ -18,6 +20,7 @@ const OrderPage = () => {
 
   const [selectedCategory, setSelectedCategory] = useState('커피');
   const [selectedSubCategory, setSelectedSubCategory] = useState('전체');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // 👇 설정 모달 상태
   const cartFabRef = useRef<HTMLButtonElement>(null);
   const cartSheetRef = useRef<HTMLDivElement>(null);
   const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
@@ -56,7 +59,6 @@ const OrderPage = () => {
 
   const handleAddToCartWrapper = async (e: React.MouseEvent, menu: any, option: any) => {
     triggerFlyAnimation(e, '#3a9df2');
-    // 👇 [수정] menu.categoryUpper 정보를 함께 전달
     await actions.addToCartHandler(menu.name, menu.price, option, menu.categoryUpper);
   };
 
@@ -118,24 +120,11 @@ const OrderPage = () => {
 
         <style>{`
           @keyframes flyFromCenter {
-            0% { 
-              transform: translate(-45vw, -35vh) scale(0.3); 
-              opacity: 0; 
-              animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            }
-            50% {
-              transform: translate(-15vw, -55vh) scale(1.15);
-              opacity: 1;
-              animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53);
-            }
-            100% { 
-              transform: translate(0, 0) scale(1); 
-              opacity: 1; 
-            }
+            0% { transform: translate(-45vw, -35vh) scale(0.3); opacity: 0; animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+            50% { transform: translate(-15vw, -55vh) scale(1.15); opacity: 1; animation-timing-function: cubic-bezier(0.55, 0.085, 0.68, 0.53); }
+            100% { transform: translate(0, 0) scale(1); opacity: 1; }
           }
-          .animate-fly-from-center {
-            animation: flyFromCenter 0.7s forwards;
-          }
+          .animate-fly-from-center { animation: flyFromCenter 0.7s forwards; }
         `}</style>
 
         <FlyingBall items={flyingItems} />
@@ -161,6 +150,13 @@ const OrderPage = () => {
             marbleCounts={state.marbleCounts}
         />
 
+        {/* 👇 설정 모달 (모달 컴포넌트 경로 주의: src/features/order/ui/SettingsModal.tsx) */}
+        <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            groupId={state.groupId || ''}
+        />
+
         <OrderHeader
             userName={state.userName}
             groupId={state.groupId || ''}
@@ -172,6 +168,7 @@ const OrderPage = () => {
             onCopyLink={() => { navigator.clipboard.writeText(window.location.href); actions.addToast('복사 완료'); }}
             onOpenHistory={() => actions.setIsHistoryOpen(true)}
             onOpenPinball={actions.handleStartRoulette}
+            onOpenSettings={() => setIsSettingsOpen(true)} // 👇 핸들러 연결
             onLogout={handleLogout}
         />
 
@@ -226,11 +223,7 @@ const OrderPage = () => {
                   const target = state.cart.find(i => i.menuName === name && i.option === option && i.userName === state.userName);
                   if (target && state.groupId) await updateCartApi(state.groupId, state.cart.filter(c => c.id !== target.id));
                 }}
-                onAdd={async (name, price, option, category) => { // category 인자 추가 (하지만 여기서 못 구함)
-                  // CartSheet에서는 category 정보를 직접 알기 어려우므로,
-                  // 1. cart item에서 가져오거나
-                  // 2. hook에서 처리하거나
-                  // 여기서는 hook에서 빈값이면 알아서 처리하도록 했으니 빈값 넘겨도 됨.
+                onAdd={async (name, price, option, category) => {
                   if (state.groupId) await addToCartApi(state.groupId, { id: Date.now(), userName: state.userName, menuName: name, price, option, category: category || '' });
                 }}
                 onClear={async () => {
