@@ -1,4 +1,4 @@
-import { Menu } from './types';
+import { Menu } from './shared/types';
 
 export const CAFE_LIST = [
   { id: 'mega', name: '메가커피', img: '🟡' },

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
-import { GroupData } from '../types';
+import { GroupData } from '../shared/types';
 import { CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { CAFE_LIST } from '../menuData';
 
