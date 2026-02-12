@@ -4,7 +4,6 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CartItem, GroupData, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory, ToastMessage, Menu, OptionType } from '../../../shared/types';
 import { getFavorites, addFavorite, removeFavorite, isFavorite } from '../../../shared/utils';
-// 👇 [수정] updateCartApi 추가 임포트
 import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi, updateCartApi } from '../api/firebaseApi';
 
 export const useOrderLogic = () => {
@@ -33,12 +32,10 @@ export const useOrderLogic = () => {
   const [favoriteMenuIds, setFavoriteMenuIds] = useState<number[]>([]);
   const prevCartRef = useRef<CartItem[]>([]);
 
-  // 초기 로드
   useEffect(() => {
     setFavoriteMenuIds(getFavorites().map(f => f.menuId));
   }, []);
 
-  // Firebase 구독
   useEffect(() => {
     if (!groupId) { navigate('/'); return; }
 
@@ -47,7 +44,6 @@ export const useOrderLogic = () => {
         const data = docSnapshot.data() as GroupData;
         const currentCart = data.cart || [];
 
-        // 알림 로직
         if (prevCartRef.current.length > 0 && currentCart.length > prevCartRef.current.length) {
           const prevIds = new Set(prevCartRef.current.map(item => item.id));
           const newItems = currentCart.filter(item => !prevIds.has(item.id));
@@ -64,13 +60,11 @@ export const useOrderLogic = () => {
         setRouletteGame(data.rouletteGame);
         setMarbleCounts(data.marbleCounts || {});
 
-        // 새 게임이 시작되면 닫힘 상태 초기화
         const status = data.rouletteGame?.status || 'idle';
         if (status === 'waiting' || status === 'ready' || status === 'playing') {
           setIsResultDismissed(false);
         }
 
-        // 수정 모드 동기화
         if (editingHistoryInfo) {
           const isNormal = editingHistoryInfo.type === 'normal';
           const targetList = isNormal ? (data.history || []) : (data.rouletteHistory || []);
@@ -90,7 +84,6 @@ export const useOrderLogic = () => {
     return () => unsub();
   }, [groupId, userName, navigate, editingHistoryInfo?.id]);
 
-  // Actions
   const addToast = (message: string, type: 'info'|'success'|'warning' = 'info') => {
     setToasts(prev => [...prev, { id: Math.random().toString(), message, type }]);
   };
@@ -108,11 +101,9 @@ export const useOrderLogic = () => {
     }
   };
 
-  // 👇 [수정] category 파라미터 추가
   const addToCartHandler = async (menuName: string, price: number, option: OptionType, category: string = '') => {
     if (!groupId) return;
 
-    // 1. 수정 모드
     if (editingHistoryInfo) {
       const isNormal = editingHistoryInfo.type === 'normal';
       const targetList = isNormal ? [...history] : [...rouletteHistory];
@@ -134,13 +125,18 @@ export const useOrderLogic = () => {
         existingItem.orderedBy = [...existingItem.orderedBy, userName];
         items[existingItemIndex] = existingItem;
       } else {
-        items.push({ menuName, option, price, count: 1, orderedBy: [userName] });
+        items.push({
+          menuName,
+          option,
+          price,
+          count: 1,
+          orderedBy: [userName]
+        });
       }
 
       targetHistory.totalPrice += price;
       // @ts-ignore
       if (targetHistory.totalItems !== undefined) targetHistory.totalItems += 1;
-
       // @ts-ignore
       if (isNormal) targetHistory.items = items; else targetHistory.orderItems = items;
 
@@ -150,44 +146,35 @@ export const useOrderLogic = () => {
       return;
     }
 
-    // 👇 [추가] '추가' 카테고리 로직 구현
     if (category === '추가') {
-      const myItems = cart.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.userName === userName);
+      const reversedCart = [...cart].reverse();
+      const targetItem = reversedCart.find(item => item.userName === userName && item.category !== '추가');
 
-      if (myItems.length > 0) {
-        const lastItemInfo = myItems[myItems.length - 1];
-        const targetIndex = lastItemInfo.originalIndex;
+      if (targetItem) {
+        const newMenuName = `${targetItem.menuName} + ${menuName}`;
+        const newPrice = targetItem.price + price;
+        const newCartList = cart.filter(i => i.id !== targetItem.id);
 
-        const newCart = [...cart];
-        const targetItem = newCart[targetIndex];
-
-        // 기존 이름에 옵션 이름 추가 (예: 아메리카노+샷)
-        const updatedName = `${targetItem.menuName}+${menuName}`;
-        const updatedPrice = targetItem.price + price;
-
-        newCart[targetIndex] = {
+        const mergedItem: CartItem = {
           ...targetItem,
-          menuName: updatedName,
-          price: updatedPrice
+          id: Date.now(),
+          menuName: newMenuName,
+          price: newPrice,
         };
 
-        await updateCartApi(groupId, newCart);
-        addToast(`${menuName} 옵션이 추가되었습니다.`, 'success');
+        newCartList.push(mergedItem);
+        await updateCartApi(groupId, newCartList);
         return;
-      } else {
-        addToast('옵션을 추가할 음료가 장바구니에 없습니다.', 'warning');
-        return; // 옵션을 추가할 대상이 없으면 아무 동작 안 함 (혹은 일반 추가로 넘길 수도 있음)
       }
     }
 
-    // 2. 일반 모드 (기존 로직)
     const newItem: CartItem = {
       id: Date.now(),
       userName,
       menuName,
       price,
       option,
-      category // 카테고리 저장
+      category: category
     };
     await addToCartApi(groupId, newItem);
   };
