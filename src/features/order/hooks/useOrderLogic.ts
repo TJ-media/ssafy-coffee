@@ -4,8 +4,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CartItem, GroupData, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory, ToastMessage, Menu, OptionType } from '../../../shared/types';
 import { getFavorites, addFavorite, removeFavorite, isFavorite } from '../../../shared/utils';
-// 👇 [수정] startRouletteGameApi 추가 임포트
-import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi } from '../api/firebaseApi';
+// 👇 [수정] updateCartApi 추가 임포트
+import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi, updateCartApi } from '../api/firebaseApi';
 
 export const useOrderLogic = () => {
   const navigate = useNavigate();
@@ -108,7 +108,8 @@ export const useOrderLogic = () => {
     }
   };
 
-  const addToCartHandler = async (menuName: string, price: number, option: OptionType) => {
+  // 👇 [수정] category 파라미터 추가
+  const addToCartHandler = async (menuName: string, price: number, option: OptionType, category: string = '') => {
     if (!groupId) return;
 
     // 1. 수정 모드
@@ -149,14 +150,44 @@ export const useOrderLogic = () => {
       return;
     }
 
-    // 2. 일반 모드
+    // 👇 [추가] '추가' 카테고리 로직 구현
+    if (category === '추가') {
+      const myItems = cart.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.userName === userName);
+
+      if (myItems.length > 0) {
+        const lastItemInfo = myItems[myItems.length - 1];
+        const targetIndex = lastItemInfo.originalIndex;
+
+        const newCart = [...cart];
+        const targetItem = newCart[targetIndex];
+
+        // 기존 이름에 옵션 이름 추가 (예: 아메리카노+샷)
+        const updatedName = `${targetItem.menuName}+${menuName}`;
+        const updatedPrice = targetItem.price + price;
+
+        newCart[targetIndex] = {
+          ...targetItem,
+          menuName: updatedName,
+          price: updatedPrice
+        };
+
+        await updateCartApi(groupId, newCart);
+        addToast(`${menuName} 옵션이 추가되었습니다.`, 'success');
+        return;
+      } else {
+        addToast('옵션을 추가할 음료가 장바구니에 없습니다.', 'warning');
+        return; // 옵션을 추가할 대상이 없으면 아무 동작 안 함 (혹은 일반 추가로 넘길 수도 있음)
+      }
+    }
+
+    // 2. 일반 모드 (기존 로직)
     const newItem: CartItem = {
       id: Date.now(),
       userName,
       menuName,
       price,
       option,
-      category: ''
+      category // 카테고리 저장
     };
     await addToCartApi(groupId, newItem);
   };
@@ -169,7 +200,6 @@ export const useOrderLogic = () => {
     }
   };
 
-  // 👇 [추가] 룰렛 시작 핸들러
   const handleStartRoulette = async () => {
     const participants = [...new Set(cart.map(item => item.userName))];
     if (participants.length < 2) {
@@ -201,7 +231,7 @@ export const useOrderLogic = () => {
       setIsCartOpen, setIsHistoryOpen, setEditingHistoryInfo,
       addToast, removeToast, toggleFavoriteHandler, addToCartHandler,
       handleCloseRoulette,
-      handleStartRoulette // 👈 내보내기
+      handleStartRoulette
     }
   };
 };

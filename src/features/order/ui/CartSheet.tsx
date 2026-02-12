@@ -10,7 +10,7 @@ interface Props {
     cartFabRef: RefObject<HTMLButtonElement | null>;
     cartSheetRef: RefObject<HTMLDivElement | null>;
     onRemove: (name: string, option: OptionType) => void;
-    onAdd: (name: string, price: number, option: OptionType) => void;
+    onAdd: (name: string, price: number, option: OptionType, category: string) => void;
     onClear: () => void;
     onClose: () => void;
     onEdit: (item: CartItem) => void;
@@ -23,7 +23,13 @@ const CartSheet = ({
 
     const groupedCart = useMemo(() => {
         return cart.reduce<Record<string, GroupedCartItem>>((acc, item) => {
-            const key = `${item.menuName}_${item.option}`;
+            // 👇 [수정] '추가' 카테고리인 경우 키에 userName을 포함하여 사용자별로 분리
+            // 일반 메뉴는 기존처럼 메뉴명+옵션으로 그룹화 (여러 사람이 시켜도 합쳐짐)
+            const isAddon = item.category === '추가';
+            const key = isAddon
+                ? `${item.menuName}_${item.option}_${item.userName}`
+                : `${item.menuName}_${item.option}`;
+
             if (!acc[key]) {
                 acc[key] = {
                     count: 0,
@@ -68,51 +74,54 @@ const CartSheet = ({
                             <p>장바구니가 비어있어요.</p>
                         </div>
                     ) : (
-                        Object.entries(groupedCart).map(([key, info]) => (
-                            <div key={key} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-                                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-text-primary flex items-center gap-2">
-                    {info.menuName}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${info.option === 'ICE' ? 'bg-blue-50 text-blue-500' : info.option === 'HOT' ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
-                      {info.option === 'ONLY' ? '-' : info.option}
-                    </span>
-                  </span>
-                                    <span className="font-bold text-text-primary">{(info.price * info.count).toLocaleString()}원</span>
-                                </div>
+                        Object.entries(groupedCart).map(([key, info]) => {
+                            return (
+                                <div key={key} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="font-bold text-text-primary flex items-center gap-2">
+                                            {info.menuName}
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${info.option === 'ICE' ? 'bg-blue-50 text-blue-500' : info.option === 'HOT' ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
+                                            {info.option === 'ONLY' ? '-' : info.option}
+                                            </span>
+                                        </span>
+                                        <span className="font-bold text-text-primary">{(info.price * info.count).toLocaleString()}원</span>
+                                    </div>
 
-                                <div className="flex justify-between items-end">
-                                    <div className="flex -space-x-2 py-1 max-w-[150px] overflow-hidden">
-                                        {info.names.map((name, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
-                                                style={{ backgroundColor: getAvatarColor(name), color: getTextContrastColor() }}
-                                                title={name}
+                                    <div className="flex justify-between items-end">
+                                        <div className="flex -space-x-2 py-1 max-w-[150px] overflow-hidden">
+                                            {info.names.map((name, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
+                                                    style={{ backgroundColor: getAvatarColor(name), color: getTextContrastColor() }}
+                                                    title={name}
+                                                >
+                                                    {name.slice(0,1)}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex items-center bg-white rounded-lg border border-gray-200 h-8 overflow-hidden">
+                                            <button
+                                                onClick={() => onRemove(info.menuName, info.option)}
+                                                disabled={!info.names.includes(userName)}
+                                                className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors"
                                             >
-                                                {name.slice(0,1)}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex items-center bg-white rounded-lg border border-gray-200 h-8 overflow-hidden">
-                                        <button
-                                            onClick={() => onRemove(info.menuName, info.option)}
-                                            disabled={!info.names.includes(userName)}
-                                            className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors"
-                                        >
-                                            <Minus size={14}/>
-                                        </button>
-                                        <span className="w-8 text-center text-sm font-bold text-text-primary">{info.count}</span>
-                                        <button
-                                            onClick={() => onAdd(info.menuName, info.price, info.option)}
-                                            className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
-                                        >
-                                            <Plus size={14}/>
-                                        </button>
+                                                <Minus size={14}/>
+                                            </button>
+                                            <span className="w-8 text-center text-sm font-bold text-text-primary">{info.count}</span>
+                                            <button
+                                                // 일반 추가는 category를 알기 어려우므로 빈 문자열로 처리 (Hook에서 처리됨)
+                                                onClick={() => onAdd(info.menuName, info.price, info.option, '')}
+                                                className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <Plus size={14}/>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
 

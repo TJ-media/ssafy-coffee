@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Lock, Minus, Plus, RotateCcw, ArrowLeft, UserCheck, UserX, Users, TrendingUp, TrendingDown, Trash2, PlusCircle, History, Pencil, X, Settings, Key } from 'lucide-react';
-import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../shared/utils';
+import { getAvatarColor, getTextContrastColor } from '../shared/utils';
 import { RouletteHistory, GroupData } from '../shared/types';
 
 const AdminPage = () => {
@@ -320,7 +320,7 @@ const AdminPage = () => {
   const updateMarbleCount = async (userName: string, newCount: number) => {
     if (!groupId) return;
     if (newCount < 1) newCount = 1;
-    if (newCount > 10) newCount = 10;
+    if (newCount > 50) newCount = 50;
 
     try {
       const groupRef = doc(db, 'groups', groupId);
@@ -1229,7 +1229,7 @@ const AdminPage = () => {
                           </div>
                           <button
                             onClick={() => updateMarbleCount(userName, count + 1)}
-                            disabled={count >= 10}
+                            disabled={count >= 50}
                             className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-gray-100 rounded-lg transition"
                           >
                             <Plus size={18} />
