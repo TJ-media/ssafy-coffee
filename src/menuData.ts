@@ -7,7 +7,7 @@ export const CAFE_LIST = [
   { id: 'compose', name: '컴포즈', img: '🟡' },
 ];
 
-export const CATEGORIES: string[] = ['즐겨찾기', '커피', '디카페인', '음료', '티', '푸드', '상품'];
+export const CATEGORIES: string[] = ['즐겨찾기', '커피', '디카페인', '음료', '티', '푸드', '상품', '추가'];
 
 export const MEGA_MENUS: Menu[] = [
   // 1. 커피 > 에스프레소
@@ -124,11 +124,21 @@ export const MEGA_MENUS: Menu[] = [
   { id: 89, categoryUpper: '푸드', categoryLower: '베이커리', name: '크로크무슈', price: 3800, img: '🍰', hasOption: false },
   { id: 90, categoryUpper: '푸드', categoryLower: '케이크', name: '치즈케익', price: 3500, img: '🍰', hasOption: false },
   { id: 91, categoryUpper: '푸드', categoryLower: '케이크', name: '티라미수케익', price: 3500, img: '🍰', hasOption: false },
-//   { id: 91, categoryUpper: '푸드', categoryLower: '밥', name: '햇반', price: 150000, img: '🍚', hasOption: false },
 
   // 13. 상품
   { id: 92, categoryUpper: '상품', categoryLower: '굿즈', name: '엠지씨 머그', price: 9300, img: '🎁', hasOption: false },
   { id: 93, categoryUpper: '상품', categoryLower: '굿즈', name: '엠지씨 텀블러(스카이)', price: 19800, img: '🎁', hasOption: false },
   { id: 94, categoryUpper: '상품', categoryLower: '홈카페', name: '스테비아 믹스커피', price: 5900, img: '🎁', hasOption: false },
-  { id: 95, categoryUpper: '상품', categoryLower: '홈카페', name: '콜드브루 상품용', price: 20000, img: '🎁', hasOption: false }
+  { id: 95, categoryUpper: '상품', categoryLower: '홈카페', name: '콜드브루 상품용', price: 20000, img: '🎁', hasOption: false },
+
+  // 14. 추가 (REQ-01)
+  { id: 96, categoryUpper: '추가', categoryLower: '추가', name: '샷 추가', price: 600, img: '➕', hasOption: false },
+  { id: 97, categoryUpper: '추가', categoryLower: '추가', name: '저당 스테비아 추가', price: 600, img: '➕', hasOption: false },
+  { id: 98, categoryUpper: '추가', categoryLower: '추가', name: '연유 추가', price: 700, img: '➕', hasOption: false },
+  { id: 99, categoryUpper: '추가', categoryLower: '추가', name: '휘핑 추가', price: 500, img: '➕', hasOption: false },
+  { id: 100, categoryUpper: '추가', categoryLower: '추가', name: '타피오카 펄 추가', price: 700, img: '⚫', hasOption: false },
+  { id: 101, categoryUpper: '추가', categoryLower: '추가', name: '바닐라 시럽 추가', price: 500, img: '➕', hasOption: false },
+  { id: 102, categoryUpper: '추가', categoryLower: '추가', name: '카라멜 시럽 추가', price: 500, img: '➕', hasOption: false },
+  { id: 103, categoryUpper: '추가', categoryLower: '추가', name: '헤이즐넛 시럽 추가', price: 500, img: '➕', hasOption: false },
+  { id: 104, categoryUpper: '추가', categoryLower: '추가', name: '꿀 추가', price: 700, img: '➕', hasOption: false },
 ];
