@@ -4,8 +4,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CartItem, GroupData, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory, ToastMessage, Menu, OptionType } from '../../../shared/types';
 import { getFavorites, addFavorite, removeFavorite, isFavorite } from '../../../shared/utils';
-// 👇 [수정] updateHistoryApi 추가 임포트
-import { addToCartApi, resetRouletteGameApi, updateHistoryApi } from '../api/firebaseApi';
+// 👇 [수정] startRouletteGameApi 추가 임포트
+import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi } from '../api/firebaseApi';
 
 export const useOrderLogic = () => {
   const navigate = useNavigate();
@@ -64,7 +64,7 @@ export const useOrderLogic = () => {
         setRouletteGame(data.rouletteGame);
         setMarbleCounts(data.marbleCounts || {});
 
-        // 새 게임이 시작되면(대기/준비/진행 중) 닫았던 창을 다시 보여줄 수 있게 상태 리셋
+        // 새 게임이 시작되면 닫힘 상태 초기화
         const status = data.rouletteGame?.status || 'idle';
         if (status === 'waiting' || status === 'ready' || status === 'playing') {
           setIsResultDismissed(false);
@@ -108,11 +108,10 @@ export const useOrderLogic = () => {
     }
   };
 
-  // 👇 [수정됨] 장바구니 담기 핸들러 (수정 모드 분기 처리 추가)
   const addToCartHandler = async (menuName: string, price: number, option: OptionType) => {
     if (!groupId) return;
 
-    // 1. 수정 모드일 경우: 히스토리에 직접 추가
+    // 1. 수정 모드
     if (editingHistoryInfo) {
       const isNormal = editingHistoryInfo.type === 'normal';
       const targetList = isNormal ? [...history] : [...rouletteHistory];
@@ -123,51 +122,34 @@ export const useOrderLogic = () => {
         return;
       }
 
-      // 객체 깊은 복사 (불변성 유지)
       const targetHistory = { ...targetList[targetIndex] };
-      // @ts-ignore (타입에 따라 필드명이 다름)
+      // @ts-ignore
       const items = isNormal ? [...targetHistory.items] : [...targetHistory.orderItems];
-
-      // 이미 있는 메뉴인지 확인
       const existingItemIndex = items.findIndex((i: HistoryItem) => i.menuName === menuName && i.option === option);
 
       if (existingItemIndex !== -1) {
-        // 수량 증가
         const existingItem = { ...items[existingItemIndex] };
         existingItem.count += 1;
         existingItem.orderedBy = [...existingItem.orderedBy, userName];
         items[existingItemIndex] = existingItem;
       } else {
-        // 신규 추가
-        items.push({
-          menuName,
-          option,
-          price,
-          count: 1,
-          orderedBy: [userName]
-        });
+        items.push({ menuName, option, price, count: 1, orderedBy: [userName] });
       }
 
-      // 총 금액 업데이트
       targetHistory.totalPrice += price;
-      // @ts-ignore (rouletteHistory에는 totalItems가 없을 수 있음)
+      // @ts-ignore
       if (targetHistory.totalItems !== undefined) targetHistory.totalItems += 1;
 
-      // 업데이트된 아이템 리스트 할당
       // @ts-ignore
-      if (isNormal) targetHistory.items = items;
-      // @ts-ignore
-      else targetHistory.orderItems = items;
+      if (isNormal) targetHistory.items = items; else targetHistory.orderItems = items;
 
       targetList[targetIndex] = targetHistory;
-
-      // DB 업데이트 요청
       await updateHistoryApi(groupId, targetList, editingHistoryInfo.type);
       addToast('주문 내역에 추가되었습니다.', 'success');
-      return; // 장바구니 추가 로직 실행 방지
+      return;
     }
 
-    // 2. 일반 모드: 장바구니에 추가
+    // 2. 일반 모드
     const newItem: CartItem = {
       id: Date.now(),
       userName,
@@ -187,6 +169,23 @@ export const useOrderLogic = () => {
     }
   };
 
+  // 👇 [추가] 룰렛 시작 핸들러
+  const handleStartRoulette = async () => {
+    const participants = [...new Set(cart.map(item => item.userName))];
+    if (participants.length < 2) {
+      addToast('커피 내기에는 2명 이상이 필요해요!', 'warning');
+      return;
+    }
+    if (!groupId) return;
+
+    try {
+      await startRouletteGameApi(groupId, participants, userName);
+    } catch (e) {
+      console.error(e);
+      addToast('룰렛 시작에 실패했어요', 'warning');
+    }
+  };
+
   const isRouletteModalOpen = !!rouletteGame
       && rouletteGame.status !== 'idle'
       && !(rouletteGame.status === 'finished' && isResultDismissed);
@@ -201,7 +200,8 @@ export const useOrderLogic = () => {
     actions: {
       setIsCartOpen, setIsHistoryOpen, setEditingHistoryInfo,
       addToast, removeToast, toggleFavoriteHandler, addToCartHandler,
-      handleCloseRoulette
+      handleCloseRoulette,
+      handleStartRoulette // 👈 내보내기
     }
   };
 };
