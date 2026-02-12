@@ -32,9 +32,23 @@ export const checkoutApi = async (groupId: string, newHistory: OrderHistory) => 
     });
 };
 
-// 👇 [추가] 룰렛 게임 초기화 (대기방 폭파)
+// 룰렛 게임 초기화 (대기방 폭파)
 export const resetRouletteGameApi = async (groupId: string) => {
     await updateDoc(getGroupRef(groupId), {
         rouletteGame: { status: 'idle', participants: [], seed: 0, chatMessages: [] }
+    });
+};
+
+// 👇 [추가] 룰렛 게임 시작 (대기방 생성)
+export const startRouletteGameApi = async (groupId: string, participants: string[], hostName: string) => {
+    await updateDoc(getGroupRef(groupId), {
+        rouletteGame: {
+            status: 'waiting',
+            participants: participants,
+            seed: Date.now(),
+            startedAt: new Date(),
+            hostName: hostName,
+            chatMessages: []
+        }
     });
 };
