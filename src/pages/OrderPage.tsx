@@ -9,10 +9,9 @@ import FlyingBall, { FlyingItem } from '../features/order/ui/FlyingBall';
 import CartSheet from '../features/order/ui/CartSheet';
 import HistoryModal from '../features/order/ui/HistoryModal';
 import RouletteModal from '../features/roulette/ui/RouletteModal';
-// 👇 경로 및 컴포넌트 이름 확인
 import SettingsModal from '../features/order/ui/SettingsModal';
 import Toast from '../shared/ui/Toast';
-import { updateHistoryApi, updateCartApi, addToCartApi } from '../features/order/api/firebaseApi';
+import {addToCartApi, updateCartApi} from "../features/order/api/firebaseApi.ts";
 
 const OrderPage = () => {
   const { state, actions } = useOrderLogic();
@@ -62,58 +61,6 @@ const OrderPage = () => {
     await actions.addToCartHandler(menu.name, menu.price, option, menu.categoryUpper);
   };
 
-  const handleHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
-    const isNormal = type === 'normal';
-    const targetList = isNormal ? state.history : state.rouletteHistory;
-    const targetObj = targetList.find(h => h.id === historyId);
-    let currentCount = 0;
-    if (targetObj) {
-      // @ts-ignore
-      const items = isNormal ? targetObj.items : targetObj.orderItems;
-      currentCount = items ? items.reduce((sum: number, i: any) => sum + i.count, 0) : 0;
-    }
-    actions.setEditingHistoryInfo({
-      id: historyId, type, count: currentCount, animationKey: Date.now()
-    });
-    actions.setIsHistoryOpen(false);
-    actions.setIsCartOpen(false);
-    actions.addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
-  };
-
-  const handleDeleteItem = async (historyId: string, type: 'normal'|'roulette', index: number, targetUser?: string) => {
-    if (!state.groupId) return;
-    const isNormal = type === 'normal';
-    const list = isNormal ? state.history : state.rouletteHistory;
-    const targetIdx = list.findIndex(h => h.id === historyId);
-    if (targetIdx === -1) return;
-
-    const targetHistory = { ...list[targetIdx] };
-    // @ts-ignore
-    const items = isNormal ? targetHistory.items : targetHistory.orderItems;
-    const item = items[index];
-
-    if (targetUser) {
-      const userIdx = item.orderedBy.indexOf(targetUser);
-      if (userIdx > -1) {
-        item.orderedBy.splice(userIdx, 1);
-        item.count -= 1;
-        targetHistory.totalPrice -= item.price;
-      }
-    } else {
-      targetHistory.totalPrice -= (item.price * item.count);
-      item.count = 0;
-    }
-
-    // @ts-ignore
-    if (isNormal) targetHistory.items = items.filter((i: any) => i.count > 0);
-    else { // @ts-ignore
-      targetHistory.orderItems = items.filter((i: any) => i.count > 0);
-    }
-
-    await updateHistoryApi(state.groupId, list.map((h, i) => i === targetIdx ? targetHistory : h), type);
-    actions.addToast('삭제되었습니다');
-  };
-
   return (
       <div className="h-full flex flex-col bg-background relative overflow-hidden">
         <Toast toasts={state.toasts} removeToast={actions.removeToast} />
@@ -136,21 +83,20 @@ const OrderPage = () => {
             rouletteHistory={state.rouletteHistory}
             groupId={state.groupId || ''}
             userName={state.userName}
-            onAddMode={handleHistoryAddMode}
-            onDeleteItem={handleDeleteItem}
+            onAddMode={actions.enableHistoryAddMode}
+            onDeleteItem={actions.deleteHistoryItem}
         />
 
         <RouletteModal
             isOpen={state.isRouletteModalOpen}
             onClose={actions.handleCloseRoulette}
             groupId={state.groupId || ''}
-            participants={state.rouletteGame?.participants || []}
             gameState={state.rouletteGame}
             cart={state.cart}
             marbleCounts={state.marbleCounts}
         />
 
-        {/* 👇 설정 모달 (모달 컴포넌트 경로 주의: src/features/order/ui/SettingsModal.tsx) */}
+        {/* 👇 설정 모달 */}
         <SettingsModal
             isOpen={isSettingsOpen}
             onClose={() => setIsSettingsOpen(false)}
@@ -168,7 +114,7 @@ const OrderPage = () => {
             onCopyLink={() => { navigator.clipboard.writeText(window.location.href); actions.addToast('복사 완료'); }}
             onOpenHistory={() => actions.setIsHistoryOpen(true)}
             onOpenPinball={actions.handleStartRoulette}
-            onOpenSettings={() => setIsSettingsOpen(true)} // 👇 핸들러 연결
+            onOpenSettings={() => setIsSettingsOpen(true)}
             onLogout={handleLogout}
         />
 

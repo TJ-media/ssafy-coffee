@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { RouletteGameState, CartItem, RouletteHistory } from '../../../shared/types';
-import { Roulette } from '../components/roulette';
+import { Roulette } from '../game-engine/roulette';
 import { getNextBusinessDay } from '../../../shared/utils';
 import { cartToHistoryItems } from '../utils/cartUtils';
 import * as rouletteApi from '../api/rouletteApi';

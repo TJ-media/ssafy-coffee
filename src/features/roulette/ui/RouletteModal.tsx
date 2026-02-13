@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { RouletteGameState, CartItem } from '../../../shared/types';
-import RouletteResult from '../components/RouletteResult';
+import RouletteResult from './RouletteResult.tsx';
 import { useRouletteGame } from '../hooks/useRouletteGame';
 import { groupCartItems } from '../utils/cartUtils';
 import GameCanvas from './GameCanvas';
