@@ -7,7 +7,8 @@ export const CAFE_LIST = [
   { id: 'compose', name: '컴포즈', img: '🟡' },
 ];
 
-export const CATEGORIES: string[] = ['즐겨찾기', '커피', '디카페인', '음료', '티', '푸드', '상품', '추가'];
+// '즐겨찾기'를 '메뉴 추가'로 변경하여 UI 중복 해결 및 탭 기능 변경
+export const CATEGORIES: string[] = ['메뉴 추가', '커피', '디카페인', '음료', '티', '푸드', '상품', '추가'];
 
 export const MEGA_MENUS: Menu[] = [
   // 1. 커피 > 에스프레소
@@ -131,7 +132,7 @@ export const MEGA_MENUS: Menu[] = [
   { id: 94, categoryUpper: '상품', categoryLower: '홈카페', name: '스테비아 믹스커피', price: 5900, img: '🎁', hasOption: false },
   { id: 95, categoryUpper: '상품', categoryLower: '홈카페', name: '콜드브루 상품용', price: 20000, img: '🎁', hasOption: false },
 
-  // 14. 추가 (REQ-01)
+  // 14. 추가
   { id: 96, categoryUpper: '추가', categoryLower: '추가', name: '샷 추가', price: 600, img: '➕', hasOption: false },
   { id: 97, categoryUpper: '추가', categoryLower: '추가', name: '저당 스테비아 추가', price: 600, img: '➕', hasOption: false },
   { id: 98, categoryUpper: '추가', categoryLower: '추가', name: '연유 추가', price: 700, img: '➕', hasOption: false },
