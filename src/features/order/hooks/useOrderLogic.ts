@@ -106,7 +106,8 @@ export const useOrderLogic = () => {
 
     if (editingHistoryInfo) {
       const isNormal = editingHistoryInfo.type === 'normal';
-      const targetList = isNormal ? [...history] : [...rouletteHistory];
+      // 복사해서 사용 (state 불변성 유지)
+      const targetList = isNormal ? history.map(h => ({...h})) : rouletteHistory.map(h => ({...h}));
       const targetIndex = targetList.findIndex(h => h.id === editingHistoryInfo.id);
 
       if (targetIndex === -1) {
@@ -114,16 +115,17 @@ export const useOrderLogic = () => {
         return;
       }
 
-      const targetHistory = { ...targetList[targetIndex] };
+      const targetHistory = targetList[targetIndex];
       // @ts-ignore
-      const items = isNormal ? [...targetHistory.items] : [...targetHistory.orderItems];
+      const originalItems = isNormal ? (targetHistory.items || []) : (targetHistory.orderItems || []);
+      // 아이템 배열 깊은 복사
+      const items = originalItems.map((i: HistoryItem) => ({ ...i, orderedBy: [...i.orderedBy] }));
+
       const existingItemIndex = items.findIndex((i: HistoryItem) => i.menuName === menuName && i.option === option);
 
       if (existingItemIndex !== -1) {
-        const existingItem = { ...items[existingItemIndex] };
-        existingItem.count += 1;
-        existingItem.orderedBy = [...existingItem.orderedBy, userName];
-        items[existingItemIndex] = existingItem;
+        items[existingItemIndex].count += 1;
+        items[existingItemIndex].orderedBy.push(userName);
       } else {
         items.push({
           menuName,
@@ -137,10 +139,10 @@ export const useOrderLogic = () => {
       targetHistory.totalPrice += price;
       // @ts-ignore
       if (targetHistory.totalItems !== undefined) targetHistory.totalItems += 1;
+
       // @ts-ignore
       if (isNormal) targetHistory.items = items; else targetHistory.orderItems = items;
 
-      targetList[targetIndex] = targetHistory;
       await updateHistoryApi(groupId, targetList, editingHistoryInfo.type);
       addToast('주문 내역에 추가되었습니다.', 'success');
       return;
@@ -183,6 +185,77 @@ export const useOrderLogic = () => {
     await addToCartApi(groupId, newItem);
   };
 
+  // 👇 [추가] 히스토리 아이템 삭제 로직 (OrderPage에서 이동)
+  const deleteHistoryItem = async (historyId: string, type: 'normal' | 'roulette', index: number, targetUser?: string) => {
+    if (!groupId) return;
+    const isNormal = type === 'normal';
+
+    // 리스트 깊은 복사 (최소한 1단계)
+    const list = isNormal ? history.map(h => ({...h})) : rouletteHistory.map(h => ({...h}));
+    const targetIdx = list.findIndex(h => h.id === historyId);
+    if (targetIdx === -1) return;
+
+    const targetHistory = list[targetIdx];
+    // @ts-ignore
+    const originalItems = isNormal ? (targetHistory.items || []) : (targetHistory.orderItems || []);
+
+    // ⚠️ 핵심: 아이템 배열과 내부 객체를 깊은 복사하여 안전하게 수정
+    const items = originalItems.map((i: HistoryItem) => ({
+      ...i,
+      orderedBy: [...i.orderedBy] // orderedBy 배열도 복사
+    }));
+
+    if (!items[index]) return;
+    const item = items[index];
+
+    if (targetUser) {
+      const userIdx = item.orderedBy.indexOf(targetUser);
+      if (userIdx > -1) {
+        item.orderedBy.splice(userIdx, 1);
+        item.count -= 1;
+        targetHistory.totalPrice -= item.price;
+      }
+    } else {
+      // targetUser가 없으면(결제자가 삭제 시) 전체 삭제
+      targetHistory.totalPrice -= (item.price * item.count);
+      item.count = 0;
+    }
+
+    // 수량이 0인 아이템 제거
+    const filteredItems = items.filter((i: HistoryItem) => i.count > 0);
+
+    // @ts-ignore
+    if (isNormal) targetHistory.items = filteredItems;
+    else { // @ts-ignore
+      targetHistory.orderItems = filteredItems;
+    }
+
+    // 리스트 업데이트
+    list[targetIdx] = targetHistory;
+
+    await updateHistoryApi(groupId, list, type);
+    addToast('삭제되었습니다');
+  };
+
+  // 👇 [추가] 히스토리 추가 모드 활성화 로직 (OrderPage에서 이동)
+  const enableHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
+    const isNormal = type === 'normal';
+    const targetList = isNormal ? history : rouletteHistory;
+    const targetObj = targetList.find(h => h.id === historyId);
+    let currentCount = 0;
+    if (targetObj) {
+      // @ts-ignore
+      const items = isNormal ? targetObj.items : targetObj.orderItems;
+      currentCount = items ? items.reduce((sum: number, i: any) => sum + i.count, 0) : 0;
+    }
+    setEditingHistoryInfo({
+      id: historyId, type, count: currentCount, animationKey: Date.now()
+    });
+    setIsHistoryOpen(false);
+    setIsCartOpen(false);
+    addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
+  };
+
   const handleCloseRoulette = () => {
     console.log("Closing roulette modal...");
     setIsResultDismissed(true);
@@ -221,8 +294,8 @@ export const useOrderLogic = () => {
     actions: {
       setIsCartOpen, setIsHistoryOpen, setEditingHistoryInfo,
       addToast, removeToast, toggleFavoriteHandler, addToCartHandler,
-      handleCloseRoulette,
-      handleStartRoulette
+      handleCloseRoulette, handleStartRoulette,
+      deleteHistoryItem, enableHistoryAddMode // 새로 추가된 액션 노출
     }
   };
 };

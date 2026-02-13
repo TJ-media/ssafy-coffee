@@ -5,7 +5,7 @@ import { Roulette } from './roulette.ts';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../../firebase.ts';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../../../shared/utils';
-import RouletteResult from './RouletteResult.tsx';
+import RouletteResult from '../ui/RouletteResult.tsx';
 
 interface RouletteModalProps {
   isOpen: boolean;
