@@ -6,7 +6,6 @@ export class VideoRecorder {
   private videoStream: MediaStream;
 
   private chunks: Blob[] = [];
-  private stopping = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.targetCanvas = canvas;
@@ -17,7 +16,6 @@ export class VideoRecorder {
   }
 
   public async start() {
-    this.stopping = false;
     return new Promise<void>((rs) => {
       this.chunks = [];
       this.mediaRecorder.ondataavailable = (e: BlobEvent) => {
@@ -43,7 +41,6 @@ export class VideoRecorder {
   }
 
   public stop() {
-    this.stopping = true;
     if (this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.stop();
     }

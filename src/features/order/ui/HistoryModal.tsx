@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { OrderHistory, RouletteHistory } from '../../../shared/types';
+import { OrderHistory, RouletteHistory, HistoryItem } from '../../../shared/types';
 import { X, Coffee, Plus, Trash2, Pencil, Check, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 import dayjs from 'dayjs';
@@ -15,12 +15,21 @@ interface Props {
   onDeleteItem: (historyId: string, type: 'normal' | 'roulette', itemIndex: number, targetUser?: string) => void;
 }
 
-const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, onDeleteItem }: Props) => {
+const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onAddMode, onDeleteItem }: Props) => {
   const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [coffeePrice, setCoffeePrice] = useState<string>('4500');
 
-  // --- 통계 계산 로직 (AdminPage에서 이식) ---
+  // 👇 [복구] 삭제 대상 선택 모달 상태
+  const [deleteTarget, setDeleteTarget] = useState<{
+    historyId: string;
+    type: 'normal' | 'roulette';
+    itemIndex: number;
+    participants: string[];
+    menuName: string;
+  } | null>(null);
+
+  // --- 통계 계산 로직 ---
   const userStats = useMemo(() => {
     const stats: { [userName: string]: { spent: number; received: number; winCount: number; playCount: number } } = {};
     rouletteHistory.forEach((game) => {
@@ -129,6 +138,45 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
     return { gamesByDay, dayNames, mostActiveDay, avgParticipants, maxSafeStreak, currentSafeStreaks, thisWeekGames };
   }, [rouletteHistory, streakStats]);
 
+  // 👇 [복구] 삭제 버튼 클릭 핸들러
+  const handleDeleteClick = (
+      hItem: OrderHistory | RouletteHistory,
+      type: 'normal' | 'roulette',
+      item: HistoryItem,
+      idx: number
+  ) => {
+    const isRoulette = type === 'roulette';
+    const winner = isRoulette ? (hItem as RouletteHistory).winner : '';
+    // 당첨자(결제자)인지 확인 (일반 주문은 결제자 개념이 없으므로 누구나 삭제 가능하게 하거나 본인만 가능하게 처리)
+    // 여기서는 룰렛 당첨자만 특권(모두 삭제 가능)을 가짐
+    const isPayer = isRoulette && winner === userName;
+
+    // 결제자가 2명 이상인 메뉴를 삭제하려고 할 때 -> 모달 띄움
+    if (isPayer && item.orderedBy.length > 1) {
+      setDeleteTarget({
+        historyId: hItem.id, type, itemIndex: idx, participants: item.orderedBy, menuName: item.menuName
+      });
+      return;
+    }
+
+    // 그 외 (본인 메뉴 삭제 or 결제자가 1명인 메뉴 삭제) -> 바로 삭제 (targetUser를 본인으로 지정하지 않음 -> 전체 삭제 or 로직 위임)
+    // 단, 본인이 본인걸 지울때는 targetUser를 지정해야 함.
+    // 기존 로직: targetUser가 있으면 그 사람만 뺌. 없으면 통으로 뺌.
+
+    // 1. 결제자면 -> targetUser 없이 호출 (통 삭제, 단 위에서 2명 이상은 걸렀으므로 1명인 경우임)
+    if (isPayer) {
+      onDeleteItem(hItem.id, type, idx, undefined);
+    } else {
+      // 2. 결제자가 아니면 -> 본인 이름(userName)을 targetUser로 넘겨서 "나만 빠지기" 시도
+      onDeleteItem(hItem.id, type, idx, userName);
+    }
+  };
+
+  const handleClose = () => {
+    setEditingId(null);
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const allHistory = [
@@ -144,7 +192,7 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
 
   return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
         <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl max-h-[85vh] flex flex-col relative z-10 animate-slide-up">
           {/* Header */}
@@ -163,7 +211,7 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                 <BarChart2 size={14} /> 통계
               </button>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
               <X size={24} className="text-gray-400" />
             </button>
           </div>
@@ -185,6 +233,9 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                         const winner = isRoulette ? (h as RouletteHistory).winner : null;
                         const items = isRoulette ? (h as RouletteHistory).orderItems : (h as OrderHistory).items;
                         const isEditing = editingId === h.id;
+
+                        // 👇 [복구] 결제자인지 확인
+                        const isPayer = isRoulette && winner === userName;
 
                         return (
                             <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all duration-300 ${isEditing ? 'border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]' : 'border-gray-200'}`}>
@@ -208,23 +259,34 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                                 </div>
                               </div>
                               <div className="space-y-3">
-                                {items.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center">
-                                      <div>
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-sm text-text-primary">{item.menuName}<span className="text-xs font-normal text-text-secondary ml-1">x {item.count}</span></span>
-                                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.option === 'ICE' ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>{item.option === 'ONLY' ? '-' : item.option}</span>
+                                {items.map((item, idx) => {
+                                  // 👇 [복구] 권한 체크: 결제자이거나, 내 이름이 포함된 메뉴여야 삭제 버튼 보임
+                                  const isMyItem = item.orderedBy.includes(userName);
+                                  const canDelete = isPayer || isMyItem;
+
+                                  return (
+                                      <div key={idx} className="flex justify-between items-center">
+                                        <div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-bold text-sm text-text-primary">{item.menuName}<span className="text-xs font-normal text-text-secondary ml-1">x {item.count}</span></span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.option === 'ICE' ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>{item.option === 'ONLY' ? '-' : item.option}</span>
+                                          </div>
+                                          <div className="flex flex-wrap gap-1 mt-1">{item.orderedBy.map((p, i) => <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">{p}</span>)}</div>
                                         </div>
-                                        <div className="flex flex-wrap gap-1 mt-1">{item.orderedBy.map((p, i) => <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">{p}</span>)}</div>
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-sm font-bold text-text-primary">{(item.price * item.count).toLocaleString()}원</span>
+                                          {isEditing && canDelete && (
+                                              <button
+                                                  onClick={() => handleDeleteClick(h, h.type, item, idx)}
+                                                  className="w-7 h-7 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100"
+                                              >
+                                                <Trash2 size={14} />
+                                              </button>
+                                          )}
+                                        </div>
                                       </div>
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-sm font-bold text-text-primary">{(item.price * item.count).toLocaleString()}원</span>
-                                        {isEditing && (
-                                            <button onClick={() => onDeleteItem(h.id, h.type, idx)} className="w-7 h-7 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100"><Trash2 size={14} /></button>
-                                        )}
-                                      </div>
-                                    </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                               {isEditing && (
                                   <button onClick={() => onAddMode(h.id, h.type)} className="w-full mt-4 py-3 bg-primary/10 text-primary rounded-xl font-bold text-sm hover:bg-primary/20 flex items-center justify-center gap-2"><Plus size={16} /> 메뉴 추가하기</button>
@@ -235,9 +297,8 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                   )}
                 </div>
             ) : (
-                /* 통계 탭 내용 */
+                // ... (통계 탭 내용은 그대로 유지) ...
                 <div className="space-y-4">
-                  {/* 개요 */}
                   <div className="grid grid-cols-3 gap-2">
                     <div className="bg-white rounded-xl p-3 shadow-sm text-center border border-gray-100">
                       <p className="text-xl font-bold text-primary">{globalStats.totalGames}</p>
@@ -257,7 +318,6 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                       <div className="text-center py-10 text-gray-400">통계 데이터가 없어요</div>
                   ) : (
                       <>
-                        {/* 재미 통계 */}
                         <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
                           <h3 className="font-bold text-purple-800 mb-3 text-sm">🎲 재미 통계</h3>
                           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -279,7 +339,6 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                           )}
                         </div>
 
-                        {/* 요일별 & 기타 통계 */}
                         <div className="grid grid-cols-2 gap-3">
                           <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-100">
                             <h3 className="font-bold text-indigo-800 mb-2 text-sm">📅 요일별 게임</h3>
@@ -311,7 +370,6 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                           </div>
                         </div>
 
-                        {/* 위험 알림 */}
                         {extraStats.currentSafeStreaks.length > 0 && (
                             <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-4 border border-red-100">
                               <h3 className="font-bold text-red-800 mb-3 text-sm">⚠️ 당첨 위험 알림</h3>
@@ -328,7 +386,6 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                             </div>
                         )}
 
-                        {/* 본전 계산기 */}
                         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
                           <h3 className="font-bold text-green-800 mb-3 text-sm">🧮 본전 계산기</h3>
                           <div className="flex gap-2 mb-3">
@@ -357,7 +414,6 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
                           )}
                         </div>
 
-                        {/* 개인별 상세 통계 */}
                         <div className="space-y-3">
                           {sortedStats.map((user, index) => {
                             const streak = streakStats[user.name];
@@ -392,6 +448,44 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, onAddMode, on
             )}
           </div>
         </div>
+
+        {/* 👇 [복구] 삭제 대상 선택 모달 (컴포넌트 내부에 중첩) */}
+        {deleteTarget && (
+            <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
+              <div className="bg-white p-6 rounded-2xl shadow-xl w-64 animate-bounce-in">
+                <h3 className="text-center font-bold text-lg mb-2">누구 메뉴를 뺄까요?</h3>
+                <p className="text-center text-xs text-text-secondary mb-4">{deleteTarget.menuName}</p>
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {deleteTarget.participants.map((p, idx) => (
+                      <button
+                          key={idx}
+                          onClick={() => {
+                            onDeleteItem(deleteTarget.historyId, deleteTarget.type, deleteTarget.itemIndex, p);
+                            setDeleteTarget(null);
+                          }}
+                          className="flex flex-col items-center gap-1 group transition-transform hover:scale-110"
+                      >
+                        <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center shadow-md border-2 border-white text-sm font-bold group-hover:ring-2 group-hover:ring-danger transition-all"
+                            style={{ backgroundColor: getAvatarColor(p), color: getTextContrastColor() }}
+                        >
+                          {p.slice(0, 1)}
+                        </div>
+                        <span className="text-xs font-medium text-text-primary group-hover:text-danger group-hover:font-bold">
+                    {p}
+                  </span>
+                      </button>
+                  ))}
+                </div>
+                <button
+                    onClick={() => setDeleteTarget(null)}
+                    className="w-full mt-6 py-2 text-sm text-gray-400 hover:text-gray-600 underline"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+        )}
       </div>
   );
 };
