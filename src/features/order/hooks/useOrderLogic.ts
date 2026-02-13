@@ -150,22 +150,26 @@ export const useOrderLogic = () => {
       const reversedCart = [...cart].reverse();
       const targetItem = reversedCart.find(item => item.userName === userName && item.category !== '추가');
 
-      if (targetItem) {
-        const newMenuName = `${targetItem.menuName} + ${menuName}`;
-        const newPrice = targetItem.price + price;
-        const newCartList = cart.filter(i => i.id !== targetItem.id);
-
-        const mergedItem: CartItem = {
-          ...targetItem,
-          id: Date.now(),
-          menuName: newMenuName,
-          price: newPrice,
-        };
-
-        newCartList.push(mergedItem);
-        await updateCartApi(groupId, newCartList);
+      if (!targetItem) {
+        addToast('추가 메뉴를 담기 전에 음료를 먼저 담아주세요!', 'warning');
         return;
       }
+
+      const newMenuName = `${targetItem.menuName} + ${menuName}`;
+      const newPrice = targetItem.price + price;
+      const newCartList = cart.filter(i => i.id !== targetItem.id);
+
+      const mergedItem: CartItem = {
+        ...targetItem,
+        id: Date.now(),
+        menuName: newMenuName,
+        price: newPrice,
+      };
+
+      newCartList.push(mergedItem);
+      await updateCartApi(groupId, newCartList);
+      addToast(`${targetItem.menuName}에 ${menuName} 완료!`, 'success');
+      return;
     }
 
     const newItem: CartItem = {
