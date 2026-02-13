@@ -4,7 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CartItem, GroupData, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory, ToastMessage, Menu, OptionType } from '../../../shared/types';
 import { getFavorites, addFavorite, removeFavorite, isFavorite } from '../../../shared/utils';
-import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi, updateCartApi } from '../api/firebaseApi';
+import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi, updateCartApi, updateCustomMenusApi } from '../api/firebaseApi';
 
 export const useOrderLogic = () => {
   const navigate = useNavigate();
@@ -18,6 +18,10 @@ export const useOrderLogic = () => {
   const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
   const [rouletteGame, setRouletteGame] = useState<RouletteGameState | undefined>(undefined);
   const [marbleCounts, setMarbleCounts] = useState<{ [userName: string]: number }>({});
+
+  // 👇 추가: 모든 유저의 커스텀 메뉴 맵, 내 커스텀 메뉴 리스트
+  const [allCustomMenus, setAllCustomMenus] = useState<{ [key: string]: Menu[] }>({});
+  const [myCustomMenus, setMyCustomMenus] = useState<Menu[]>([]);
 
   // UI State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -60,6 +64,11 @@ export const useOrderLogic = () => {
         setRouletteGame(data.rouletteGame);
         setMarbleCounts(data.marbleCounts || {});
 
+        // 👇 추가: 커스텀 메뉴 동기화
+        const loadedCustomMenus = data.customMenus || {};
+        setAllCustomMenus(loadedCustomMenus);
+        setMyCustomMenus(loadedCustomMenus[userName] || []);
+
         const status = data.rouletteGame?.status || 'idle';
         if (status === 'waiting' || status === 'ready' || status === 'playing') {
           setIsResultDismissed(false);
@@ -101,13 +110,53 @@ export const useOrderLogic = () => {
     }
   };
 
+  // 👇 추가: 커스텀 메뉴 저장 핸들러
+  const saveCustomMenuHandler = async (menu: Menu) => {
+    if (!groupId) return;
+
+    // 내 기존 목록에서 중복 이름 제거 (업데이트 효과) 후 맨 앞에 추가
+    const newMyList = [menu, ...myCustomMenus.filter(m => m.name !== menu.name)].slice(0, 10); // 최대 10개
+
+    const newAllMenus = {
+      ...allCustomMenus,
+      [userName]: newMyList
+    };
+
+    try {
+      await updateCustomMenusApi(groupId, newAllMenus);
+      // addToast('메뉴가 기록에 저장되었습니다', 'success'); (너무 자주 뜨면 귀찮으므로 주석 처리 or 필요 시 해제)
+    } catch (e) {
+      console.error("Failed to save custom menu", e);
+      addToast('기록 저장 실패', 'warning');
+    }
+  };
+
+  // 👇 추가: 커스텀 메뉴 삭제 핸들러
+  const deleteCustomMenuHandler = async (menuId: number) => {
+    if (!groupId) return;
+
+    const newMyList = myCustomMenus.filter(m => m.id !== menuId);
+
+    const newAllMenus = {
+      ...allCustomMenus,
+      [userName]: newMyList
+    };
+
+    try {
+      await updateCustomMenusApi(groupId, newAllMenus);
+    } catch (e) {
+      console.error(e);
+      addToast('삭제 실패', 'warning');
+    }
+  };
+
+
   const addToCartHandler = async (menuName: string, price: number, option: OptionType, category: string = '') => {
     if (!groupId) return;
 
     if (editingHistoryInfo) {
       const isNormal = editingHistoryInfo.type === 'normal';
-      // 복사해서 사용 (state 불변성 유지)
-      const targetList = isNormal ? history.map(h => ({...h})) : rouletteHistory.map(h => ({...h}));
+      const targetList = isNormal ? [...history] : [...rouletteHistory];
       const targetIndex = targetList.findIndex(h => h.id === editingHistoryInfo.id);
 
       if (targetIndex === -1) {
@@ -115,17 +164,16 @@ export const useOrderLogic = () => {
         return;
       }
 
-      const targetHistory = targetList[targetIndex];
+      const targetHistory = { ...targetList[targetIndex] };
       // @ts-ignore
-      const originalItems = isNormal ? (targetHistory.items || []) : (targetHistory.orderItems || []);
-      // 아이템 배열 깊은 복사
-      const items = originalItems.map((i: HistoryItem) => ({ ...i, orderedBy: [...i.orderedBy] }));
-
+      const items = isNormal ? [...targetHistory.items] : [...targetHistory.orderItems];
       const existingItemIndex = items.findIndex((i: HistoryItem) => i.menuName === menuName && i.option === option);
 
       if (existingItemIndex !== -1) {
-        items[existingItemIndex].count += 1;
-        items[existingItemIndex].orderedBy.push(userName);
+        const existingItem = { ...items[existingItemIndex] };
+        existingItem.count += 1;
+        existingItem.orderedBy = [...existingItem.orderedBy, userName];
+        items[existingItemIndex] = existingItem;
       } else {
         items.push({
           menuName,
@@ -139,10 +187,10 @@ export const useOrderLogic = () => {
       targetHistory.totalPrice += price;
       // @ts-ignore
       if (targetHistory.totalItems !== undefined) targetHistory.totalItems += 1;
-
       // @ts-ignore
       if (isNormal) targetHistory.items = items; else targetHistory.orderItems = items;
 
+      targetList[targetIndex] = targetHistory;
       await updateHistoryApi(groupId, targetList, editingHistoryInfo.type);
       addToast('주문 내역에 추가되었습니다.', 'success');
       return;
@@ -152,26 +200,22 @@ export const useOrderLogic = () => {
       const reversedCart = [...cart].reverse();
       const targetItem = reversedCart.find(item => item.userName === userName && item.category !== '추가');
 
-      if (!targetItem) {
-        addToast('추가 메뉴를 담기 전에 음료를 먼저 담아주세요!', 'warning');
+      if (targetItem) {
+        const newMenuName = `${targetItem.menuName} + ${menuName}`;
+        const newPrice = targetItem.price + price;
+        const newCartList = cart.filter(i => i.id !== targetItem.id);
+
+        const mergedItem: CartItem = {
+          ...targetItem,
+          id: Date.now(),
+          menuName: newMenuName,
+          price: newPrice,
+        };
+
+        newCartList.push(mergedItem);
+        await updateCartApi(groupId, newCartList);
         return;
       }
-
-      const newMenuName = `${targetItem.menuName} + ${menuName}`;
-      const newPrice = targetItem.price + price;
-      const newCartList = cart.filter(i => i.id !== targetItem.id);
-
-      const mergedItem: CartItem = {
-        ...targetItem,
-        id: Date.now(),
-        menuName: newMenuName,
-        price: newPrice,
-      };
-
-      newCartList.push(mergedItem);
-      await updateCartApi(groupId, newCartList);
-      addToast(`${targetItem.menuName}에 ${menuName} 완료!`, 'success');
-      return;
     }
 
     const newItem: CartItem = {
@@ -185,79 +229,7 @@ export const useOrderLogic = () => {
     await addToCartApi(groupId, newItem);
   };
 
-  // 👇 [추가] 히스토리 아이템 삭제 로직 (OrderPage에서 이동)
-  const deleteHistoryItem = async (historyId: string, type: 'normal' | 'roulette', index: number, targetUser?: string) => {
-    if (!groupId) return;
-    const isNormal = type === 'normal';
-
-    // 리스트 깊은 복사 (최소한 1단계)
-    const list = isNormal ? history.map(h => ({...h})) : rouletteHistory.map(h => ({...h}));
-    const targetIdx = list.findIndex(h => h.id === historyId);
-    if (targetIdx === -1) return;
-
-    const targetHistory = list[targetIdx];
-    // @ts-ignore
-    const originalItems = isNormal ? (targetHistory.items || []) : (targetHistory.orderItems || []);
-
-    // ⚠️ 핵심: 아이템 배열과 내부 객체를 깊은 복사하여 안전하게 수정
-    const items = originalItems.map((i: HistoryItem) => ({
-      ...i,
-      orderedBy: [...i.orderedBy] // orderedBy 배열도 복사
-    }));
-
-    if (!items[index]) return;
-    const item = items[index];
-
-    if (targetUser) {
-      const userIdx = item.orderedBy.indexOf(targetUser);
-      if (userIdx > -1) {
-        item.orderedBy.splice(userIdx, 1);
-        item.count -= 1;
-        targetHistory.totalPrice -= item.price;
-      }
-    } else {
-      // targetUser가 없으면(결제자가 삭제 시) 전체 삭제
-      targetHistory.totalPrice -= (item.price * item.count);
-      item.count = 0;
-    }
-
-    // 수량이 0인 아이템 제거
-    const filteredItems = items.filter((i: HistoryItem) => i.count > 0);
-
-    // @ts-ignore
-    if (isNormal) targetHistory.items = filteredItems;
-    else { // @ts-ignore
-      targetHistory.orderItems = filteredItems;
-    }
-
-    // 리스트 업데이트
-    list[targetIdx] = targetHistory;
-
-    await updateHistoryApi(groupId, list, type);
-    addToast('삭제되었습니다');
-  };
-
-  // 👇 [추가] 히스토리 추가 모드 활성화 로직 (OrderPage에서 이동)
-  const enableHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
-    const isNormal = type === 'normal';
-    const targetList = isNormal ? history : rouletteHistory;
-    const targetObj = targetList.find(h => h.id === historyId);
-    let currentCount = 0;
-    if (targetObj) {
-      // @ts-ignore
-      const items = isNormal ? targetObj.items : targetObj.orderItems;
-      currentCount = items ? items.reduce((sum: number, i: any) => sum + i.count, 0) : 0;
-    }
-    setEditingHistoryInfo({
-      id: historyId, type, count: currentCount, animationKey: Date.now()
-    });
-    setIsHistoryOpen(false);
-    setIsCartOpen(false);
-    addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
-  };
-
   const handleCloseRoulette = () => {
-    console.log("Closing roulette modal...");
     setIsResultDismissed(true);
     if (rouletteGame?.status === 'waiting' && groupId) {
       resetRouletteGameApi(groupId).catch(e => console.error("게임 초기화 실패:", e));
@@ -289,13 +261,16 @@ export const useOrderLogic = () => {
       groupId, userName, cart, totalPrice, history, rouletteHistory,
       rouletteGame, marbleCounts, toasts, favoriteMenuIds,
       isCartOpen, isHistoryOpen, editingHistoryInfo,
-      isRouletteModalOpen
+      isRouletteModalOpen,
+      myCustomMenus // 👇 내 커스텀 메뉴 리스트 반환
     },
     actions: {
       setIsCartOpen, setIsHistoryOpen, setEditingHistoryInfo,
       addToast, removeToast, toggleFavoriteHandler, addToCartHandler,
-      handleCloseRoulette, handleStartRoulette,
-      deleteHistoryItem, enableHistoryAddMode // 새로 추가된 액션 노출
+      handleCloseRoulette,
+      handleStartRoulette,
+      saveCustomMenuHandler, // 👇 액션 반환
+      deleteCustomMenuHandler // 👇 액션 반환
     }
   };
 };

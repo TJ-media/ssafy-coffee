@@ -8,6 +8,7 @@ export interface Menu {
   price: number;
   img: string;
   hasOption: boolean;
+  defaultOption?: OptionType; // 👈 추가: 커스텀 메뉴의 기본 옵션 저장 (ICE/HOT)
 }
 
 export interface CartItem {
@@ -31,6 +32,7 @@ export interface GroupData {
   marbleCounts?: { [userName: string]: number };
   approvedUsers?: string[];
   pendingUsers?: string[];
+  customMenus?: { [userName: string]: Menu[] };
 }
 
 export interface GroupedCartItem {
@@ -45,6 +47,7 @@ export interface FavoriteItem {
   menuId: number;
   menuName: string;
   addedAt: number;
+  // defaultOption?: OptionType; // 즐겨찾기에도 옵션 저장이 필요하다면 추후 고려
 }
 
 export interface HistoryItem {
