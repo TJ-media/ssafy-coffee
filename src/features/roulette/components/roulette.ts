@@ -19,7 +19,6 @@ import { MouseEventHandlerName, type MouseEventName } from './types/mouseEvents.
 import { FastForwader } from './fastForwader.ts';
 import { ColorTheme } from './types/ColorTheme.ts';
 
-// 마블 위치 데이터 타입
 export type MarblePosition = {
   id: number;
   name: string;
@@ -39,11 +38,9 @@ export class Roulette extends EventTarget {
   private _timeScale = 1;
   private _speed = 1;
 
-  // 고정 프레임 동기화용
   private _gameStartTime: number = 0;
   private _executedSteps: number = 0;
 
-  // 애니메이션 프레임 정리용
   private _animationFrameId: number = 0;
   private _isDestroyed: boolean = false;
 
@@ -56,7 +53,7 @@ export class Roulette extends EventTarget {
 
   private _effects: GameObject[] = [];
 
-  private _winnerRank = -1; // -1이면 options에서 가져옴
+  private _winnerRank = -1;
   private _totalMarbleCount = 0;
   private _goalDist: number = Infinity;
   private _isRunning: boolean = false;
@@ -73,9 +70,12 @@ export class Roulette extends EventTarget {
   private fastForwarder!: FastForwader;
   private _theme: ColorTheme = Themes.dark;
 
-  // 스펙테이터 모드 관련
   private _isSpectator: boolean = false;
+  // @ts-ignore
   private _spectatorPositions: MarblePosition[] = [];
+
+  // 이벤트 핸들러 참조 저장
+  private _boundMouseHandlers: Map<string, EventListener> = new Map();
 
   get isReady() {
     return this._isReady;
@@ -116,59 +116,35 @@ export class Roulette extends EventTarget {
     if (!this._lastTime) this._lastTime = Date.now();
     const currentTime = Date.now();
 
-    // 게임 실행 중이면 고정 프레임 방식 (디바이스 간 동기화)
-    if (this._isRunning && !this._isSpectator) {
-      // 게임 시작 후 경과 시간 (ms)
-      const elapsedSinceStart = (currentTime - this._gameStartTime) * this._speed * this.fastForwarder.speed;
-      // 목표 step 수
-      const targetSteps = Math.floor(elapsedSinceStart / this._updateInterval);
+    // 1. 델타 타임 계산 (ms)
+    const deltaTime = currentTime - this._lastTime;
+    this._lastTime = currentTime;
 
-      // 고정 interval (동기화를 위해 timeScale 미적용)
-      const interval = this._updateInterval / 1000;
+    // 2. 배속 적용 (현재 배속을 곱해서 누적)
+    const effectiveSpeed = this._speed * (this.fastForwarder ? this.fastForwarder.speed : 1);
+    this._elapsed += deltaTime * effectiveSpeed;
 
-      // 한 프레임당 최대 step 수 제한 (렉 방지)
-      const maxStepsPerFrame = 20;
-      let stepsThisFrame = 0;
-
-      while (this._executedSteps < targetSteps && stepsThisFrame < maxStepsPerFrame) {
-        this.physics.step(interval);
-        this._updateMarbles(this._updateInterval);
-        this._particleManager.update(this._updateInterval);
-        this._updateEffects(this._updateInterval);
-        this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
-        this._executedSteps++;
-        stepsThisFrame++;
-      }
-    } else {
-      // 게임 시작 전 또는 스펙테이터 모드: 기존 방식
-      this._elapsed += (currentTime - this._lastTime) * this._speed * this.fastForwarder.speed;
-      if (this._elapsed > 100) {
-        this._elapsed %= 100;
-      }
-
-      const interval = (this._updateInterval / 1000) * this._timeScale;
-
-      if (!this._isSpectator) {
-        while (this._elapsed >= this._updateInterval) {
-          this.physics.step(interval);
-          this._updateMarbles(this._updateInterval);
-          this._particleManager.update(this._updateInterval);
-          this._updateEffects(this._updateInterval);
-          this._elapsed -= this._updateInterval;
-          this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
-        }
-      } else {
-        // 스펙테이터 모드: 파티클과 이펙트만 업데이트
-        while (this._elapsed >= this._updateInterval) {
-          this._particleManager.update(this._updateInterval);
-          this._updateEffects(this._updateInterval);
-          this._elapsed -= this._updateInterval;
-          this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
-        }
-      }
+    // 3. 렉 방지 캡 (최대 100ms)
+    if (this._elapsed > 100) {
+      this._elapsed = 100;
     }
 
-    this._lastTime = currentTime;
+    const intervalSeconds = this._updateInterval / 1000;
+
+    // 4. 누적된 시간만큼 로직 수행
+    while (this._elapsed >= this._updateInterval) {
+      if (!this._isSpectator) {
+        this.physics.step(intervalSeconds);
+        this._updateMarbles(this._updateInterval);
+      }
+
+      this._particleManager.update(this._updateInterval);
+      this._updateEffects(this._updateInterval);
+      this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+
+      this._elapsed -= this._updateInterval;
+      this._executedSteps++;
+    }
 
     if (this._marbles.length > 1) {
       this._marbles.sort((a, b) => b.y - a.y);
@@ -180,15 +156,14 @@ export class Roulette extends EventTarget {
         stage: this._stage,
         needToZoom: this._goalDist < zoomThreshold,
         targetIndex:
-          this._winners.length > 0
-            ? this._winnerRank - this._winners.length
-            : 0,
+            this._winners.length > 0
+                ? this._winnerRank - this._winners.length
+                : 0,
       });
     }
 
     this._render();
 
-    // 파괴되지 않은 경우에만 다음 프레임 요청
     if (!this._isDestroyed) {
       this._animationFrameId = window.requestAnimationFrame(this._update);
     }
@@ -208,32 +183,32 @@ export class Roulette extends EventTarget {
         this._winners.push(marble);
         if (this._isRunning && this._winners.length === this._winnerRank + 1) {
           this.dispatchEvent(
-            new CustomEvent('goal', { detail: { winner: marble.name } }),
+              new CustomEvent('goal', { detail: { winner: marble.name } }),
           );
           this._winner = marble;
           this._isRunning = false;
           this._particleManager.shot(
-            this._renderer.width,
-            this._renderer.height,
+              this._renderer.width,
+              this._renderer.height,
           );
           setTimeout(() => {
             this._recorder?.stop();
           }, 1000);
         } else if (
-          this._isRunning &&
-          this._winnerRank === this._winners.length &&
-          this._winnerRank === this._totalMarbleCount - 1
+            this._isRunning &&
+            this._winnerRank === this._winners.length &&
+            this._winnerRank === this._totalMarbleCount - 1
         ) {
           this.dispatchEvent(
-            new CustomEvent('goal', {
-              detail: { winner: this._marbles[i + 1].name },
-            }),
+              new CustomEvent('goal', {
+                detail: { winner: this._marbles[i + 1].name },
+              }),
           );
           this._winner = this._marbles[i + 1];
           this._isRunning = false;
           this._particleManager.shot(
-            this._renderer.width,
-            this._renderer.height,
+              this._renderer.width,
+              this._renderer.height,
           );
           setTimeout(() => {
             this._recorder?.stop();
@@ -251,7 +226,7 @@ export class Roulette extends EventTarget {
     this._timeScale = this._calcTimeScale();
 
     this._marbles = this._marbles.filter(
-      (marble) => marble.y <= this._stage!.goalY,
+        (marble) => marble.y <= this._stage!.goalY,
     );
   }
 
@@ -259,13 +234,13 @@ export class Roulette extends EventTarget {
     if (!this._stage) return 1;
     const targetIndex = this._winnerRank - this._winners.length;
     if (
-      this._winners.length < this._winnerRank + 1 &&
-      this._goalDist < zoomThreshold
+        this._winners.length < this._winnerRank + 1 &&
+        this._goalDist < zoomThreshold
     ) {
       if (
-        this._marbles[targetIndex].y >
-        this._stage.zoomY - zoomThreshold * 1.2 &&
-        (this._marbles[targetIndex - 1] || this._marbles[targetIndex + 1])
+          this._marbles[targetIndex].y >
+          this._stage.zoomY - zoomThreshold * 1.2 &&
+          (this._marbles[targetIndex - 1] || this._marbles[targetIndex + 1])
       ) {
         return Math.max(0.2, this._goalDist / zoomThreshold);
       }
@@ -316,7 +291,9 @@ export class Roulette extends EventTarget {
       }
     });
     this.addUiObject(minimap);
-    this.fastForwarder = new FastForwader();
+
+    // canvas 전달
+    this.fastForwarder = new FastForwader(this._renderer.canvas);
     this.addUiObject(this.fastForwarder);
     this._stage = stages[0];
     this._loadMap();
@@ -335,11 +312,11 @@ export class Roulette extends EventTarget {
       if (!bounds) {
         obj[handlerName]({ ...pos, button: e.button });
       } else if (
-        bounds &&
-        pos.x >= bounds.x &&
-        pos.y >= bounds.y &&
-        pos.x <= bounds.x + bounds.w &&
-        pos.y <= bounds.y + bounds.h
+          bounds &&
+          pos.x >= bounds.x &&
+          pos.y >= bounds.y &&
+          pos.x <= bounds.x + bounds.w &&
+          pos.y <= bounds.y + bounds.h
       ) {
         obj[handlerName]({ x: pos.x - bounds.x, y: pos.y - bounds.y, button: e.button });
       } else {
@@ -350,14 +327,25 @@ export class Roulette extends EventTarget {
 
   private attachEvent() {
     ['MouseMove', 'MouseUp', 'MouseDown', 'DblClick'].forEach(
-      (ev) => {
-        // @ts-ignore
-        this._renderer.canvas.addEventListener(ev.toLowerCase().replace('mouse', 'pointer'), this.mouseHandler.bind(this, ev));
-      },
+        (ev) => {
+          const domEventName = ev.toLowerCase().replace('mouse', 'pointer');
+          // @ts-ignore: Event vs MouseEvent 타입 호환성 해결
+          const handler = this.mouseHandler.bind(this, ev) as EventListener;
+          this._boundMouseHandlers.set(domEventName, handler);
+          this._renderer.canvas.addEventListener(domEventName, handler);
+        },
     );
-    this._renderer.canvas.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
+
+    const contextMenuHandler = (e: Event) => e.preventDefault();
+    this._boundMouseHandlers.set('contextmenu', contextMenuHandler);
+    this._renderer.canvas.addEventListener('contextmenu', contextMenuHandler);
+  }
+
+  private detachEvent() {
+    this._boundMouseHandlers.forEach((handler, eventName) => {
+      this._renderer.canvas.removeEventListener(eventName, handler);
     });
+    this._boundMouseHandlers.clear();
   }
 
   private _loadMap() {
@@ -378,11 +366,9 @@ export class Roulette extends EventTarget {
 
   public start() {
     this._isRunning = true;
-    // 고정 프레임 동기화: 게임 시작 시간 기록
     this._gameStartTime = Date.now();
     this._executedSteps = 0;
 
-    // setWinningRank로 미리 설정하지 않았으면 (-1) options에서 가져옴
     if (this._winnerRank < 0) {
       this._winnerRank = options.winningRank;
     }
@@ -428,10 +414,9 @@ export class Roulette extends EventTarget {
   public setMarbles(names: string[], seed?: number) {
     this.reset();
 
-    // 시드 설정 (결정론적 시뮬레이션)
     if (seed !== undefined) {
-      setSeed(seed);  // 전역 시드 설정 (marble.ts에서 사용)
-      this.physics.setSeed(seed);  // 물리 엔진 시드 설정
+      setSeed(seed);
+      this.physics.setSeed(seed);
     }
 
     const arr = names.slice();
@@ -440,15 +425,15 @@ export class Roulette extends EventTarget {
     let minWeight = Infinity;
 
     const members = arr
-      .map((nameString) => {
-        const result = parseName(nameString);
-        if (!result) return null;
-        const { name, weight, count } = result;
-        if (weight > maxWeight) maxWeight = weight;
-        if (weight < minWeight) minWeight = weight;
-        return { name, weight, count };
-      })
-      .filter((member) => !!member);
+        .map((nameString) => {
+          const result = parseName(nameString);
+          if (!result) return null;
+          const { name, weight, count } = result;
+          if (weight > maxWeight) maxWeight = weight;
+          if (weight < minWeight) minWeight = weight;
+          return { name, weight, count };
+        })
+        .filter((member) => !!member);
 
     const gap = maxWeight - minWeight;
 
@@ -460,25 +445,24 @@ export class Roulette extends EventTarget {
       }
     });
 
-    // 시드를 사용하여 동일한 순서 보장
     const orders = shuffle(
-      Array(totalCount)
-        .fill(0)
-        .map((_, i) => i),
-      seed,
+        Array(totalCount)
+            .fill(0)
+            .map((_, i) => i),
+        seed,
     );
     members.forEach((member) => {
       if (member) {
         for (let j = 0; j < member.count; j++) {
           const order = orders.pop() || 0;
           this._marbles.push(
-            new Marble(
-              this.physics,
-              order,
-              totalCount,
-              member.name,
-              member.weight,
-            ),
+              new Marble(
+                  this.physics,
+                  order,
+                  totalCount,
+                  member.name,
+                  member.weight,
+              ),
           );
         }
       }
@@ -496,19 +480,25 @@ export class Roulette extends EventTarget {
     this._clearMap();
     this._loadMap();
     this._goalDist = Infinity;
-    this._winnerRank = -1; // 다음 게임을 위해 초기화
+    this._winnerRank = -1;
     this._gameStartTime = 0;
     this._executedSteps = 0;
     this._isRunning = false;
   }
 
-  // 컴포넌트 언마운트 시 리소스 정리
   public destroy() {
     this._isDestroyed = true;
     if (this._animationFrameId) {
       window.cancelAnimationFrame(this._animationFrameId);
       this._animationFrameId = 0;
     }
+
+    this.detachEvent();
+
+    if (this.fastForwarder) {
+      this.fastForwarder.destroy();
+    }
+
     this.clearMarbles();
     this._clearMap();
   }
@@ -536,7 +526,6 @@ export class Roulette extends EventTarget {
     this._camera.initializePosition();
   }
 
-  // 스펙테이터 모드 설정
   public setSpectatorMode(isSpectator: boolean) {
     this._isSpectator = isSpectator;
   }
@@ -545,7 +534,6 @@ export class Roulette extends EventTarget {
     return this._isSpectator;
   }
 
-  // 호스트가 마블 위치 가져오기
   public getMarblePositions(): MarblePosition[] {
     return this._marbles.map((marble) => ({
       id: marble.id,
@@ -557,36 +545,31 @@ export class Roulette extends EventTarget {
     }));
   }
 
-  // 스펙테이터가 마블 위치 설정
   public setMarblePositions(positions: MarblePosition[]) {
     if (!this._isSpectator) return;
 
     this._spectatorPositions = positions;
 
-    // 마블 배열 업데이트 (렌더링용)
     positions.forEach((pos) => {
       const marble = this._marbles.find((m) => m.id === pos.id);
       if (marble) {
-        // 물리 엔진 위치 직접 설정 (spectator용)
         this.physics.setMarblePosition?.(pos.id, pos.x, pos.y, pos.angle);
       }
     });
   }
 
-  // 승자 설정 (스펙테이터용)
   public setWinner(winnerName: string) {
     const winner = this._marbles.find((m) => m.name === winnerName);
     if (winner) {
       this._winner = winner;
       this._isRunning = false;
       this._particleManager.shot(
-        this._renderer.width,
-        this._renderer.height,
+          this._renderer.width,
+          this._renderer.height,
       );
     }
   }
 
-  // 게임 실행 상태 확인
   public isRunning() {
     return this._isRunning;
   }

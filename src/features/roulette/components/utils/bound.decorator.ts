@@ -1,6 +1,6 @@
 export function bound<T extends Function>(
   // eslint-disable-next-line
-  target: any,
+  _target: any,
   propertyKey: string,
   descriptor: TypedPropertyDescriptor<T>
 ): TypedPropertyDescriptor<T> {
