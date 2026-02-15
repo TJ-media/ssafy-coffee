@@ -2,11 +2,15 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import OrderPage from './pages/OrderPage';
 import AdminPage from './pages/AdminPage';
+import GlobalNoticeListener from './features/system/ui/GlobalNoticeListener';
 import './index.css';
 
 function App() {
   return (
     <BrowserRouter>
+      {/* 모든 페이지에서 긴급 공지를 수신 */}
+      <GlobalNoticeListener />
+
       <Routes>
         {/* AdminPage는 전체 화면 사용 */}
         <Route path="/admin" element={<AdminPage />} />

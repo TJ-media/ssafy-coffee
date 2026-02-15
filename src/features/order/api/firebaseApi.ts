@@ -17,7 +17,7 @@ export const updateCartApi = async (groupId: string, newCart: CartItem[]) => {
     });
 };
 
-export const updateHistoryApi = async (groupId: string, newHistory: OrderHistory[] | RouletteHistory[], type: 'normal'|'roulette') => {
+export const updateHistoryApi = async (groupId: string, newHistory: OrderHistory[] | RouletteHistory[], type: 'normal' | 'roulette') => {
     const groupRef = doc(db, 'groups', groupId);
     if (type === 'normal') {
         await updateDoc(groupRef, { history: newHistory });
