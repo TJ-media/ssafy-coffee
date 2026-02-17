@@ -65,6 +65,7 @@ export interface OrderHistory {
   totalItems: number;
   items: HistoryItem[];
   participants: string[];
+  winner?: string | null;
 }
 
 export interface ToastMessage {
