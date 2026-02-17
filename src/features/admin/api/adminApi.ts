@@ -61,6 +61,8 @@ export interface SystemStats {
     todayTotalOrderAmount: number;
     activeGroups: number;       // 장바구니에 아이템이 있는 그룹
     totalParticipants: number;  // 전체 승인된 유저 수 합산
+    allGroupsList: GroupInfo[];       // 전체 그룹 목록
+    activeGroupsList: GroupInfo[];    // 활성 그룹 목록 (장바구니 아이템 있는)
 }
 
 export const fetchSystemStats = async (): Promise<SystemStats> => {
@@ -71,11 +73,13 @@ export const fetchSystemStats = async (): Promise<SystemStats> => {
     let todayTotalOrderAmount = 0;
     let activeGroups = 0;
     let totalParticipants = 0;
+    const activeGroupsList: GroupInfo[] = [];
 
-    groups.forEach(({ data }) => {
+    groups.forEach(({ id, data }) => {
         // 활성 그룹: 장바구니에 아이템이 있거나 승인된 유저가 있는 경우
         if (data.cart && data.cart.length > 0) {
             activeGroups++;
+            activeGroupsList.push({ id, data });
         }
 
         // 승인된 유저 수 합산
@@ -112,6 +116,8 @@ export const fetchSystemStats = async (): Promise<SystemStats> => {
         todayTotalOrderAmount,
         activeGroups,
         totalParticipants,
+        allGroupsList: groups,
+        activeGroupsList,
     };
 };
 
