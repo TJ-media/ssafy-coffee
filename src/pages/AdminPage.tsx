@@ -71,7 +71,7 @@ const AdminPage = () => {
     // ─── 통계 탭 상태 ───
     const [stats, setStats] = useState<SystemStats | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
-    const [expandedStatCard, setExpandedStatCard] = useState<'all' | 'active' | null>(null);
+    const [expandedStatCard, setExpandedStatCard] = useState<'all' | 'active' | 'participants' | 'orders' | null>(null);
 
     // ─── 방 청소 탭 상태 ───
     const [oldGroups, setOldGroups] = useState<GroupInfo[]>([]);
@@ -706,64 +706,98 @@ const AdminPage = () => {
                                         <p className="text-xs text-secondary mt-2">클릭하여 목록 보기</p>
                                     </div>
 
-                                    {/* 전체 참여자 */}
-                                    <div className="bg-white rounded-2xl shadow-toss p-6">
+                                    {/* 전체 참여자 (클릭 가능) */}
+                                    <div
+                                        onClick={() => setExpandedStatCard(expandedStatCard === 'participants' ? null : 'participants')}
+                                        className={`bg-white rounded-2xl shadow-toss p-6 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${expandedStatCard === 'participants' ? 'ring-2 ring-purple-400/40' : ''}`}
+                                    >
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
                                                 <Users size={24} className="text-purple-500" />
                                             </div>
-                                            <span className="text-xs font-medium text-text-secondary bg-purple-50 px-2 py-1 rounded-full">
-                                                참여자
-                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-xs font-medium text-text-secondary bg-purple-50 px-2 py-1 rounded-full">
+                                                    참여자
+                                                </span>
+                                                {expandedStatCard === 'participants' ? (
+                                                    <ChevronUp size={16} className="text-purple-500" />
+                                                ) : (
+                                                    <ChevronDown size={16} className="text-text-secondary" />
+                                                )}
+                                            </div>
                                         </div>
                                         <p className="text-3xl font-extrabold text-text-primary mb-1">
                                             {stats.totalParticipants}
                                             <span className="text-lg font-normal text-text-secondary ml-1">명</span>
                                         </p>
                                         <p className="text-sm text-text-secondary">전체 승인된 사용자 수</p>
+                                        <p className="text-xs text-purple-500 mt-2">클릭하여 목록 보기</p>
                                     </div>
 
-                                    {/* 오늘 주문 금액 */}
-                                    <div className="bg-white rounded-2xl shadow-toss p-6">
+                                    {/* 오늘 주문 금액 (클릭 가능) */}
+                                    <div
+                                        onClick={() => setExpandedStatCard(expandedStatCard === 'orders' ? null : 'orders')}
+                                        className={`bg-white rounded-2xl shadow-toss p-6 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 ${expandedStatCard === 'orders' ? 'ring-2 ring-amber-400/40' : ''}`}
+                                    >
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
                                                 <ShoppingBag size={24} className="text-amber-500" />
                                             </div>
-                                            <span className="text-xs font-medium text-text-secondary bg-amber-50 px-2 py-1 rounded-full">
-                                                오늘
-                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-xs font-medium text-text-secondary bg-amber-50 px-2 py-1 rounded-full">
+                                                    오늘
+                                                </span>
+                                                {expandedStatCard === 'orders' ? (
+                                                    <ChevronUp size={16} className="text-amber-500" />
+                                                ) : (
+                                                    <ChevronDown size={16} className="text-text-secondary" />
+                                                )}
+                                            </div>
                                         </div>
                                         <p className="text-3xl font-extrabold text-text-primary mb-1">
                                             {formatPrice(stats.todayTotalOrderAmount)}
                                             <span className="text-lg font-normal text-text-secondary ml-1">원</span>
                                         </p>
                                         <p className="text-sm text-text-secondary">오늘 하루 전체 주문 금액</p>
+                                        <p className="text-xs text-amber-500 mt-2">클릭하여 그룹별 금액 보기</p>
                                     </div>
                                 </div>
 
-                                {/* ─── 확장된 그룹 목록 ─── */}
+                                {/* ─── 확장된 목록 ─── */}
                                 {expandedStatCard && (
                                     <div className="mt-6 animate-fade-in-up">
                                         <div className="bg-white rounded-2xl shadow-toss overflow-hidden">
                                             {/* 목록 헤더 */}
-                                            <div className={`px-5 py-4 flex items-center justify-between border-b border-gray-100 ${expandedStatCard === 'all' ? 'bg-blue-50' : 'bg-green-50'
+                                            <div className={`px-5 py-4 flex items-center justify-between border-b border-gray-100 ${expandedStatCard === 'all' ? 'bg-blue-50' :
+                                                expandedStatCard === 'active' ? 'bg-green-50' :
+                                                    expandedStatCard === 'participants' ? 'bg-purple-50' :
+                                                        'bg-amber-50'
                                                 }`}>
                                                 <div className="flex items-center gap-2">
                                                     {expandedStatCard === 'all' ? (
                                                         <Layers size={18} className="text-primary" />
-                                                    ) : (
+                                                    ) : expandedStatCard === 'active' ? (
                                                         <Activity size={18} className="text-secondary" />
+                                                    ) : expandedStatCard === 'participants' ? (
+                                                        <Users size={18} className="text-purple-500" />
+                                                    ) : (
+                                                        <ShoppingBag size={18} className="text-amber-500" />
                                                     )}
                                                     <h3 className="font-bold text-text-primary text-sm">
-                                                        {expandedStatCard === 'all' ? '전체 그룹 목록' : '활성 그룹 목록'}
+                                                        {expandedStatCard === 'all' ? '전체 그룹 목록' :
+                                                            expandedStatCard === 'active' ? '활성 그룹 목록' :
+                                                                expandedStatCard === 'participants' ? '그룹별 승인된 사용자' :
+                                                                    '그룹별 오늘 주문 금액'}
                                                     </h3>
-                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${expandedStatCard === 'all'
-                                                        ? 'bg-primary/10 text-primary'
-                                                        : 'bg-secondary/10 text-secondary'
+                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${expandedStatCard === 'all' ? 'bg-primary/10 text-primary' :
+                                                        expandedStatCard === 'active' ? 'bg-secondary/10 text-secondary' :
+                                                            expandedStatCard === 'participants' ? 'bg-purple-100 text-purple-600' :
+                                                                'bg-amber-100 text-amber-600'
                                                         }`}>
-                                                        {expandedStatCard === 'all'
-                                                            ? stats.allGroupsList.length
-                                                            : stats.activeGroupsList.length}개
+                                                        {expandedStatCard === 'all' ? `${stats.allGroupsList.length}개` :
+                                                            expandedStatCard === 'active' ? `${stats.activeGroupsList.length}개` :
+                                                                expandedStatCard === 'participants' ? `${stats.participantsGroupsList.length}개 그룹` :
+                                                                    `${stats.todayOrderGroupsList.length}개 그룹`}
                                                     </span>
                                                 </div>
                                                 <button
@@ -776,6 +810,98 @@ const AdminPage = () => {
 
                                             {/* 목록 내용 */}
                                             {(() => {
+                                                // 오늘 주문 금액 탭
+                                                if (expandedStatCard === 'orders') {
+                                                    if (stats.todayOrderGroupsList.length === 0) {
+                                                        return (
+                                                            <div className="py-10 text-center">
+                                                                <p className="text-sm text-text-secondary">오늘 주문이 없습니다.</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+                                                            {stats.todayOrderGroupsList
+                                                                .sort((a, b) => b.todayAmount - a.todayAmount)
+                                                                .map((group) => (
+                                                                    <div
+                                                                        key={group.id}
+                                                                        className="px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition"
+                                                                    >
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <h4 className="font-bold text-text-primary text-sm truncate">
+                                                                                {group.id}
+                                                                            </h4>
+                                                                        </div>
+                                                                        <span className="shrink-0 ml-3 px-3 py-1.5 bg-amber-50 text-amber-600 text-sm font-bold rounded-full">
+                                                                            {formatPrice(group.todayAmount)}원
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            {/* 합계 */}
+                                                            <div className="px-5 py-4 flex items-center justify-between bg-amber-50/50">
+                                                                <span className="font-bold text-text-primary text-sm">합계</span>
+                                                                <span className="text-amber-600 text-sm font-extrabold">
+                                                                    {formatPrice(stats.todayTotalOrderAmount)}원
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                // 참여자 탭
+                                                if (expandedStatCard === 'participants') {
+                                                    if (stats.participantsGroupsList.length === 0) {
+                                                        return (
+                                                            <div className="py-10 text-center">
+                                                                <p className="text-sm text-text-secondary">승인된 사용자가 없습니다.</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+                                                            {stats.participantsGroupsList
+                                                                .sort((a, b) => (b.data.approvedUsers?.length || 0) - (a.data.approvedUsers?.length || 0))
+                                                                .map((group) => (
+                                                                    <div
+                                                                        key={group.id}
+                                                                        className="px-5 py-4 hover:bg-gray-50 transition"
+                                                                    >
+                                                                        <div className="flex items-center justify-between mb-2">
+                                                                            <h4 className="font-bold text-text-primary text-sm truncate">
+                                                                                {group.id}
+                                                                            </h4>
+                                                                            <span className="shrink-0 ml-3 px-2 py-1 bg-purple-50 text-purple-600 text-xs font-bold rounded-full">
+                                                                                {group.data.approvedUsers?.length || 0}명
+                                                                            </span>
+                                                                        </div>
+                                                                        {group.data.approvedUsers && group.data.approvedUsers.length > 0 && (
+                                                                            <div className="flex flex-wrap gap-1.5 mt-1">
+                                                                                {group.data.approvedUsers.map((user, idx) => (
+                                                                                    <span
+                                                                                        key={idx}
+                                                                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50/80 text-purple-700 text-xs rounded-md"
+                                                                                    >
+                                                                                        <Users size={10} />
+                                                                                        {typeof user === 'string' ? user : (user as any).name || (user as any).nickname || `사용자 ${idx + 1}`}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            {/* 합계 */}
+                                                            <div className="px-5 py-4 flex items-center justify-between bg-purple-50/50">
+                                                                <span className="font-bold text-text-primary text-sm">전체 승인된 사용자</span>
+                                                                <span className="text-purple-600 text-sm font-extrabold">
+                                                                    {stats.totalParticipants}명
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                // 전체/활성 그룹 탭 (기존)
                                                 const groups = expandedStatCard === 'all'
                                                     ? stats.allGroupsList
                                                     : stats.activeGroupsList;

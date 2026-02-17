@@ -56,6 +56,11 @@ export const fetchAllGroups = async (): Promise<GroupInfo[]> => {
 };
 
 // ─── 시스템 통계 조회 ───
+export interface TodayOrderGroup {
+    id: string;
+    todayAmount: number;
+}
+
 export interface SystemStats {
     totalGroups: number;
     todayTotalOrderAmount: number;
@@ -63,6 +68,8 @@ export interface SystemStats {
     totalParticipants: number;  // 전체 승인된 유저 수 합산
     allGroupsList: GroupInfo[];       // 전체 그룹 목록
     activeGroupsList: GroupInfo[];    // 활성 그룹 목록 (장바구니 아이템 있는)
+    participantsGroupsList: GroupInfo[]; // 승인된 사용자가 있는 그룹 목록
+    todayOrderGroupsList: TodayOrderGroup[]; // 오늘 주문이 있는 그룹별 금액
 }
 
 export const fetchSystemStats = async (): Promise<SystemStats> => {
@@ -74,6 +81,8 @@ export const fetchSystemStats = async (): Promise<SystemStats> => {
     let activeGroups = 0;
     let totalParticipants = 0;
     const activeGroupsList: GroupInfo[] = [];
+    const participantsGroupsList: GroupInfo[] = [];
+    const todayOrderGroupsList: TodayOrderGroup[] = [];
 
     groups.forEach(({ id, data }) => {
         // 활성 그룹: 장바구니에 아이템이 있거나 승인된 유저가 있는 경우
@@ -83,11 +92,13 @@ export const fetchSystemStats = async (): Promise<SystemStats> => {
         }
 
         // 승인된 유저 수 합산
-        if (data.approvedUsers) {
+        if (data.approvedUsers && data.approvedUsers.length > 0) {
             totalParticipants += data.approvedUsers.length;
+            participantsGroupsList.push({ id, data });
         }
 
         // 오늘 주문 내역의 금액 합산
+        let groupTodayAmount = 0;
         if (data.history) {
             data.history.forEach((order) => {
                 const orderedAt = order.orderedAt;
@@ -105,9 +116,14 @@ export const fetchSystemStats = async (): Promise<SystemStats> => {
                 }
 
                 if (orderDate && orderDate >= todayStart) {
-                    todayTotalOrderAmount += order.totalPrice || 0;
+                    const amount = order.totalPrice || 0;
+                    todayTotalOrderAmount += amount;
+                    groupTodayAmount += amount;
                 }
             });
+        }
+        if (groupTodayAmount > 0) {
+            todayOrderGroupsList.push({ id, todayAmount: groupTodayAmount });
         }
     });
 
@@ -118,6 +134,8 @@ export const fetchSystemStats = async (): Promise<SystemStats> => {
         totalParticipants,
         allGroupsList: groups,
         activeGroupsList,
+        participantsGroupsList,
+        todayOrderGroupsList,
     };
 };
 
