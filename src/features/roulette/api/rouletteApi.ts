@@ -1,6 +1,6 @@
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { RouletteHistory } from '../../../shared/types';
+import { RouletteHistory, MarblePositionData } from '../../../shared/types';
 
 export const startRouletteGame = async (groupId: string) => {
     const groupRef = doc(db, 'groups', groupId);
@@ -48,5 +48,16 @@ export const saveRouletteHistory = async (
         rouletteHistory: arrayUnion(historyItem),
         cart: [], // 장바구니 비우기
         marbleCounts: newMarbleCounts, // 공 개수 업데이트
+    });
+};
+
+// 호스트가 마블 위치를 Firebase에 브로드캐스트
+export const broadcastMarblePositions = async (
+    groupId: string,
+    positions: MarblePositionData[]
+) => {
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+        'rouletteGame.marblePositions': positions,
     });
 };

@@ -31,11 +31,7 @@ export type MarblePosition = {
 export class Roulette extends EventTarget {
   private _marbles: Marble[] = [];
 
-  private _lastTime: number = 0;
-  private _elapsed: number = 0;
-
   private _updateInterval = 10;
-  private _timeScale = 1;
   private _speed = 1;
 
   private _gameStartTime: number = 0;
@@ -70,9 +66,7 @@ export class Roulette extends EventTarget {
   private fastForwarder!: FastForwader;
   private _theme: ColorTheme = Themes.dark;
 
-  private _isSpectator: boolean = false;
-  // @ts-ignore
-  private _spectatorPositions: MarblePosition[] = [];
+
 
   // 이벤트 핸들러 참조 저장
   private _boundMouseHandlers: Map<string, EventListener> = new Map();
@@ -113,39 +107,40 @@ export class Roulette extends EventTarget {
 
   @bound
   private _update() {
-    if (!this._lastTime) this._lastTime = Date.now();
     const currentTime = Date.now();
-
-    // 1. 델타 타임 계산 (ms)
-    const deltaTime = currentTime - this._lastTime;
-    this._lastTime = currentTime;
-
-    // 2. 배속 적용 (현재 배속을 곱해서 누적)
-    const effectiveSpeed = this._speed * (this.fastForwarder ? this.fastForwarder.speed : 1);
-    this._elapsed += deltaTime * effectiveSpeed;
-
-    // 3. 렉 방지 캡 (최대 100ms)
-    if (this._elapsed > 100) {
-      this._elapsed = 100;
-    }
-
     const intervalSeconds = this._updateInterval / 1000;
 
-    // 4. 누적된 시간만큼 로직 수행
-    while (this._elapsed >= this._updateInterval) {
-      if (!this._isSpectator) {
+    // 게임이 실행 중일 때만 스텝 동기화 적용
+    if (this._gameStartTime > 0) {
+      // 배속 적용
+      const effectiveSpeed = this._speed * (this.fastForwarder ? this.fastForwarder.speed : 1);
+
+      // 절대 경과 시간으로 실행해야 할 총 스텝 수 계산 (프레임레이트 무관)
+      const totalElapsed = (currentTime - this._gameStartTime) * effectiveSpeed;
+      const targetSteps = Math.floor(totalElapsed / this._updateInterval);
+
+      // 이미 실행한 스텝과의 차이만큼 추가 실행 (렉 방지 캡: 최대 10스텝)
+      const stepsToRun = Math.min(targetSteps - this._executedSteps, 10);
+
+      for (let i = 0; i < stepsToRun; i++) {
         this.physics.step(intervalSeconds);
+
+        // sort를 step 내부에서 실행 — 모든 클라이언트가 동일 순서로 마블 처리
+        if (this._marbles.length > 1) {
+          this._marbles.sort((a, b) => b.y - a.y);
+        }
+
         this._updateMarbles(this._updateInterval);
+
+        this._particleManager.update(this._updateInterval);
+        this._updateEffects(this._updateInterval);
+        this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
+
+        this._executedSteps++;
       }
-
-      this._particleManager.update(this._updateInterval);
-      this._updateEffects(this._updateInterval);
-      this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
-
-      this._elapsed -= this._updateInterval;
-      this._executedSteps++;
     }
 
+    // 렌더링용 sort (카메라 추적을 위해)
     if (this._marbles.length > 1) {
       this._marbles.sort((a, b) => b.y - a.y);
     }
@@ -156,9 +151,9 @@ export class Roulette extends EventTarget {
         stage: this._stage,
         needToZoom: this._goalDist < zoomThreshold,
         targetIndex:
-            this._winners.length > 0
-                ? this._winnerRank - this._winners.length
-                : 0,
+          this._winners.length > 0
+            ? this._winnerRank - this._winners.length
+            : 0,
       });
     }
 
@@ -183,32 +178,32 @@ export class Roulette extends EventTarget {
         this._winners.push(marble);
         if (this._isRunning && this._winners.length === this._winnerRank + 1) {
           this.dispatchEvent(
-              new CustomEvent('goal', { detail: { winner: marble.name } }),
+            new CustomEvent('goal', { detail: { winner: marble.name } }),
           );
           this._winner = marble;
           this._isRunning = false;
           this._particleManager.shot(
-              this._renderer.width,
-              this._renderer.height,
+            this._renderer.width,
+            this._renderer.height,
           );
           setTimeout(() => {
             this._recorder?.stop();
           }, 1000);
         } else if (
-            this._isRunning &&
-            this._winnerRank === this._winners.length &&
-            this._winnerRank === this._totalMarbleCount - 1
+          this._isRunning &&
+          this._winnerRank === this._winners.length &&
+          this._winnerRank === this._totalMarbleCount - 1
         ) {
           this.dispatchEvent(
-              new CustomEvent('goal', {
-                detail: { winner: this._marbles[i + 1].name },
-              }),
+            new CustomEvent('goal', {
+              detail: { winner: this._marbles[i + 1].name },
+            }),
           );
           this._winner = this._marbles[i + 1];
           this._isRunning = false;
           this._particleManager.shot(
-              this._renderer.width,
-              this._renderer.height,
+            this._renderer.width,
+            this._renderer.height,
           );
           setTimeout(() => {
             this._recorder?.stop();
@@ -223,30 +218,14 @@ export class Roulette extends EventTarget {
     const targetIndex = this._winnerRank - this._winners.length;
     const topY = this._marbles[targetIndex] ? this._marbles[targetIndex].y : 0;
     this._goalDist = Math.abs(this._stage.zoomY - topY);
-    this._timeScale = this._calcTimeScale();
+
 
     this._marbles = this._marbles.filter(
-        (marble) => marble.y <= this._stage!.goalY,
+      (marble) => marble.y <= this._stage!.goalY,
     );
   }
 
-  private _calcTimeScale(): number {
-    if (!this._stage) return 1;
-    const targetIndex = this._winnerRank - this._winners.length;
-    if (
-        this._winners.length < this._winnerRank + 1 &&
-        this._goalDist < zoomThreshold
-    ) {
-      if (
-          this._marbles[targetIndex].y >
-          this._stage.zoomY - zoomThreshold * 1.2 &&
-          (this._marbles[targetIndex - 1] || this._marbles[targetIndex + 1])
-      ) {
-        return Math.max(0.2, this._goalDist / zoomThreshold);
-      }
-    }
-    return 1;
-  }
+
 
   private _updateEffects(deltaTime: number) {
     this._effects.forEach((effect) => effect.update(deltaTime));
@@ -312,11 +291,11 @@ export class Roulette extends EventTarget {
       if (!bounds) {
         obj[handlerName]({ ...pos, button: e.button });
       } else if (
-          bounds &&
-          pos.x >= bounds.x &&
-          pos.y >= bounds.y &&
-          pos.x <= bounds.x + bounds.w &&
-          pos.y <= bounds.y + bounds.h
+        bounds &&
+        pos.x >= bounds.x &&
+        pos.y >= bounds.y &&
+        pos.x <= bounds.x + bounds.w &&
+        pos.y <= bounds.y + bounds.h
       ) {
         obj[handlerName]({ x: pos.x - bounds.x, y: pos.y - bounds.y, button: e.button });
       } else {
@@ -327,13 +306,13 @@ export class Roulette extends EventTarget {
 
   private attachEvent() {
     ['MouseMove', 'MouseUp', 'MouseDown', 'DblClick'].forEach(
-        (ev) => {
-          const domEventName = ev.toLowerCase().replace('mouse', 'pointer');
-          // @ts-ignore: Event vs MouseEvent 타입 호환성 해결
-          const handler = this.mouseHandler.bind(this, ev) as EventListener;
-          this._boundMouseHandlers.set(domEventName, handler);
-          this._renderer.canvas.addEventListener(domEventName, handler);
-        },
+      (ev) => {
+        const domEventName = ev.toLowerCase().replace('mouse', 'pointer');
+        // @ts-ignore: Event vs MouseEvent 타입 호환성 해결
+        const handler = this.mouseHandler.bind(this, ev) as EventListener;
+        this._boundMouseHandlers.set(domEventName, handler);
+        this._renderer.canvas.addEventListener(domEventName, handler);
+      },
     );
 
     const contextMenuHandler = (e: Event) => e.preventDefault();
@@ -425,15 +404,15 @@ export class Roulette extends EventTarget {
     let minWeight = Infinity;
 
     const members = arr
-        .map((nameString) => {
-          const result = parseName(nameString);
-          if (!result) return null;
-          const { name, weight, count } = result;
-          if (weight > maxWeight) maxWeight = weight;
-          if (weight < minWeight) minWeight = weight;
-          return { name, weight, count };
-        })
-        .filter((member) => !!member);
+      .map((nameString) => {
+        const result = parseName(nameString);
+        if (!result) return null;
+        const { name, weight, count } = result;
+        if (weight > maxWeight) maxWeight = weight;
+        if (weight < minWeight) minWeight = weight;
+        return { name, weight, count };
+      })
+      .filter((member) => !!member);
 
     const gap = maxWeight - minWeight;
 
@@ -446,23 +425,23 @@ export class Roulette extends EventTarget {
     });
 
     const orders = shuffle(
-        Array(totalCount)
-            .fill(0)
-            .map((_, i) => i),
-        seed,
+      Array(totalCount)
+        .fill(0)
+        .map((_, i) => i),
+      seed,
     );
     members.forEach((member) => {
       if (member) {
         for (let j = 0; j < member.count; j++) {
           const order = orders.pop() || 0;
           this._marbles.push(
-              new Marble(
-                  this.physics,
-                  order,
-                  totalCount,
-                  member.name,
-                  member.weight,
-              ),
+            new Marble(
+              this.physics,
+              order,
+              totalCount,
+              member.name,
+              member.weight,
+            ),
           );
         }
       }
@@ -526,13 +505,7 @@ export class Roulette extends EventTarget {
     this._camera.initializePosition();
   }
 
-  public setSpectatorMode(isSpectator: boolean) {
-    this._isSpectator = isSpectator;
-  }
 
-  public isSpectatorMode() {
-    return this._isSpectator;
-  }
 
   public getMarblePositions(): MarblePosition[] {
     return this._marbles.map((marble) => ({
@@ -545,18 +518,6 @@ export class Roulette extends EventTarget {
     }));
   }
 
-  public setMarblePositions(positions: MarblePosition[]) {
-    if (!this._isSpectator) return;
-
-    this._spectatorPositions = positions;
-
-    positions.forEach((pos) => {
-      const marble = this._marbles.find((m) => m.id === pos.id);
-      if (marble) {
-        this.physics.setMarblePosition?.(pos.id, pos.x, pos.y, pos.angle);
-      }
-    });
-  }
 
   public setWinner(winnerName: string) {
     const winner = this._marbles.find((m) => m.name === winnerName);
@@ -564,8 +525,8 @@ export class Roulette extends EventTarget {
       this._winner = winner;
       this._isRunning = false;
       this._particleManager.shot(
-          this._renderer.width,
-          this._renderer.height,
+        this._renderer.width,
+        this._renderer.height,
       );
     }
   }
