@@ -522,6 +522,7 @@ const AdminPage = () => {
                                 title="로그아웃"
                             >
                                 <LogOut size={14} />
+                                로그아웃
 
                             </button>
                         </div>
