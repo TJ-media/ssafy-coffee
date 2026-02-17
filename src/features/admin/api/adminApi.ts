@@ -1,6 +1,35 @@
-import { collection, doc, getDocs, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { GroupData } from '../../../shared/types';
+
+// ─── 슈퍼관리자 초기 비밀번호 ───
+const DEFAULT_SUPER_ADMIN_PASSWORD = '0000';
+
+/* 
+ * 슈퍼관리자 비밀번호 조회
+ * - system/config 문서가 없으면 기본 비밀번호('0000')로 자동 생성
+ */
+export const fetchSuperAdminPassword = async (): Promise<string> => {
+    const configRef = doc(db, 'system', 'config');
+    const configSnap = await getDoc(configRef);
+
+    if (configSnap.exists()) {
+        const data = configSnap.data();
+        return data.superAdminPassword || DEFAULT_SUPER_ADMIN_PASSWORD;
+    }
+
+    // 문서가 없으면 기본 비밀번호로 생성
+    await setDoc(configRef, { superAdminPassword: DEFAULT_SUPER_ADMIN_PASSWORD });
+    return DEFAULT_SUPER_ADMIN_PASSWORD;
+};
+
+/**
+ * 슈퍼관리자 비밀번호 변경
+ */
+export const updateSuperAdminPassword = async (newPassword: string) => {
+    const configRef = doc(db, 'system', 'config');
+    await setDoc(configRef, { superAdminPassword: newPassword }, { merge: true });
+};
 
 // ─── 공지사항 전송 ───
 export const sendGlobalNotice = async (message: string) => {
