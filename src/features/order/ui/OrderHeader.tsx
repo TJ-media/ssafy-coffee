@@ -19,10 +19,10 @@ interface Props {
 }
 
 const OrderHeader: React.FC<Props> = ({
-                                          groupId, userName, selectedCategory, selectedSubCategory,
-                                          onSelectCategory, onSelectSubCategory, subCategories,
-                                          onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout
-                                      }) => {
+    groupId, userName, selectedCategory, selectedSubCategory,
+    onSelectCategory, onSelectSubCategory, subCategories,
+    onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout
+}) => {
     const categoryScrollRef = useRef<HTMLDivElement>(null);
     const subCategoryScrollRef = useRef<HTMLDivElement>(null);
 
@@ -73,36 +73,36 @@ const OrderHeader: React.FC<Props> = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
-                    <button onClick={onCopyLink} className="p-2 hover:text-primary"><Link size={20}/></button>
-                    <button onClick={onOpenHistory} className="p-2 hover:text-primary"><History size={20}/></button>
-                    <button onClick={onOpenPinball} className="p-2 hover:text-primary"><Target size={20}/></button>
-                    <button onClick={onOpenSettings} className="p-2 hover:text-primary"><Settings size={20}/></button> {/* 👇 추가 */}
-                    <button onClick={onLogout} className="p-2 hover:text-danger"><LogOut size={20}/></button>
+                    <button onClick={onCopyLink} className="p-2 hover:text-primary"><Link size={20} /></button>
+                    <button onClick={onOpenHistory} className="p-2 hover:text-primary"><History size={20} /></button>
+                    <button onClick={onOpenPinball} className="p-2 hover:text-primary"><Target size={20} /></button>
+                    <button onClick={onOpenSettings} className="p-2 hover:text-primary"><Settings size={20} /></button>
+                    <button onClick={onLogout} className="p-2 hover:text-danger"><LogOut size={20} /></button>
                 </div>
             </div>
 
-            {/* 카테고리 스크롤 영역 (기존 코드 유지) */}
+            {/* 카테고리 스크롤 영역 */}
             <div className="relative group px-6 pb-2">
-                {canScrollCatLeft && <button onClick={() => scrollContainer(categoryScrollRef, 'left')} className="absolute left-0 top-0 bottom-2 z-10 w-12 bg-gradient-to-r from-white to-transparent flex items-center justify-start pl-2 text-gray-400 hover:text-primary transition-colors"><ChevronLeft size={24} /></button>}
+                {canScrollCatLeft && <button onClick={() => scrollContainer(categoryScrollRef, 'left')} className="absolute left-0 top-0 bottom-2 z-10 w-14 bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-3 text-gray-400 hover:text-primary transition-colors"><ChevronLeft size={24} /></button>}
                 <div ref={categoryScrollRef} onScroll={() => checkScroll(categoryScrollRef, setCanScrollCatLeft, setCanScrollCatRight)} className="flex overflow-x-auto space-x-2 no-scrollbar">
                     <button onClick={() => onSelectCategory('즐겨찾기')} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap flex items-center gap-1 shrink-0 ${selectedCategory === '즐겨찾기' ? 'bg-primary text-white shadow-md' : 'bg-white hover:bg-gray-50'}`}><Heart size={14} fill={selectedCategory === '즐겨찾기' ? 'white' : 'none'} /> 즐겨찾기</button>
                     {CATEGORIES.map(cat => (
                         <button key={cat} onClick={() => onSelectCategory(cat)} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap shrink-0 ${selectedCategory === cat ? 'bg-primary text-white shadow-md' : 'bg-white hover:bg-gray-50'}`}>{cat}</button>
                     ))}
                 </div>
-                {canScrollCatRight && <button onClick={() => scrollContainer(categoryScrollRef, 'right')} className="absolute right-0 top-0 bottom-2 z-10 w-12 bg-gradient-to-l from-white to-transparent flex items-center justify-end pr-2 text-gray-400 hover:text-primary transition-colors"><ChevronRight size={24} /></button>}
+                {canScrollCatRight && <button onClick={() => scrollContainer(categoryScrollRef, 'right')} className="absolute right-0 top-0 bottom-2 z-10 w-14 bg-gradient-to-l from-white via-white/80 to-transparent flex items-center justify-end pr-3 text-gray-400 hover:text-primary transition-colors"><ChevronRight size={24} /></button>}
             </div>
 
-            {/* 서브카테고리 영역 (기존 코드 유지) */}
+            {/* 서브카테고리 영역 */}
             {selectedCategory !== '즐겨찾기' && (
                 <div className="relative px-6 py-3 border-t border-dashed border-gray-100 bg-gray-50/50">
-                    {canScrollSubLeft && <button onClick={() => scrollContainer(subCategoryScrollRef, 'left')} className="absolute left-0 top-3 bottom-3 z-10 w-10 bg-gradient-to-r from-gray-50 to-transparent flex items-center justify-start pl-2 text-gray-400 hover:text-primary transition-colors"><ChevronLeft size={20} /></button>}
+                    {canScrollSubLeft && <button onClick={() => scrollContainer(subCategoryScrollRef, 'left')} className="absolute left-0 top-3 bottom-3 z-10 w-12 bg-gradient-to-r from-gray-50 via-gray-50/80 to-transparent flex items-center justify-start pl-3 text-gray-400 hover:text-primary transition-colors"><ChevronLeft size={20} /></button>}
                     <div ref={subCategoryScrollRef} onScroll={() => checkScroll(subCategoryScrollRef, setCanScrollSubLeft, setCanScrollSubRight)} className="flex overflow-x-auto space-x-2 no-scrollbar">
                         {subCategories.map(sub => (
                             <button key={sub} onClick={() => onSelectSubCategory(sub)} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border shrink-0 ${selectedSubCategory === sub ? 'bg-white border-primary text-primary' : 'border-transparent text-text-secondary hover:bg-gray-200'}`}>{sub}</button>
                         ))}
                     </div>
-                    {canScrollSubRight && <button onClick={() => scrollContainer(subCategoryScrollRef, 'right')} className="absolute right-0 top-3 bottom-3 z-10 w-10 bg-gradient-to-l from-gray-50 to-transparent flex items-center justify-end pr-2 text-gray-400 hover:text-primary transition-colors"><ChevronRight size={20} /></button>}
+                    {canScrollSubRight && <button onClick={() => scrollContainer(subCategoryScrollRef, 'right')} className="absolute right-0 top-3 bottom-3 z-10 w-12 bg-gradient-to-l from-gray-50 via-gray-50/80 to-transparent flex items-center justify-end pr-3 text-gray-400 hover:text-primary transition-colors"><ChevronRight size={20} /></button>}
                 </div>
             )}
         </div>
