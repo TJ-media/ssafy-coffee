@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { OrderHistory, RouletteHistory, HistoryItem } from '../../../shared/types';
-import { X, Coffee, Plus, Trash2, Pencil, Check, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
+import { X, Coffee, Plus, Trash2, Pencil, Check, TrendingUp, TrendingDown, BarChart2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 import dayjs from 'dayjs';
 
@@ -20,6 +20,10 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
   const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [coffeePrice, setCoffeePrice] = useState<string>('4500');
+
+  // 👇 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
   // 👇 [복구] 삭제 대상 선택 모달 상태
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -229,82 +233,148 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
                   <p>아직 주문 내역이 없어요</p>
                 </div>
               ) : (
-                allHistory.map((h) => {
-                  const date = h.type === 'normal' ? (h as OrderHistory).orderedAt : (h as RouletteHistory).playedAt;
-                  const dateObj = date?.toDate ? date.toDate() : new Date(date);
-                  const isRoulette = h.type === 'roulette';
-                  const winner = isRoulette ? (h as RouletteHistory).winner : (h as OrderHistory).winner;
-                  const items = isRoulette ? (h as RouletteHistory).orderItems : (h as OrderHistory).items;
-                  const participants = h.participants || [];
-                  const isEditing = editingId === h.id;
+                <>
+                  {allHistory.slice(currentPage * ITEMS_PER_PAGE, (currentPage + 1) * ITEMS_PER_PAGE).map((h) => {
+                    const date = h.type === 'normal' ? (h as OrderHistory).orderedAt : (h as RouletteHistory).playedAt;
+                    const dateObj = date?.toDate ? date.toDate() : new Date(date);
+                    const isRoulette = h.type === 'roulette';
+                    const winner = isRoulette ? (h as RouletteHistory).winner : (h as OrderHistory).winner;
+                    const items = isRoulette ? (h as RouletteHistory).orderItems : (h as OrderHistory).items;
+                    const participants = h.participants || [];
+                    const isEditing = editingId === h.id;
 
-                  // 결제자인지 확인
-                  const isPayer = winner === userName;
+                    // 결제자인지 확인
+                    const isPayer = winner === userName;
 
-                  return (
-                    <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all duration-300 ${isEditing ? 'border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]' : 'border-gray-200'}`}>
-                      <div className="flex justify-between items-start mb-4 pb-3 border-b border-dashed">
-                        <div>
-                          <span className={`text-sm font-bold px-2.5 py-1 rounded-full mb-2 inline-block ${isRoulette ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
-                            {isRoulette ? '🎲 룰렛 게임' : '☕ 일반 주문'}
-                          </span>
-                          <div className="text-xs text-text-secondary">{dayjs(dateObj).format('YYYY.MM.DD HH:mm')}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="text-right mr-1">
-                            <div className="text-xs text-text-secondary">결제자</div>
-                            {winner ? (
-                              <div className="font-bold text-primary text-base">{winner}</div>
-                            ) : (
-                              <button
-                                onClick={() => setPayerTarget({ historyId: h.id, type: h.type, participants })}
-                                className="font-bold text-base text-gray-400 underline decoration-dashed underline-offset-2 hover:text-primary transition-colors cursor-pointer"
-                              >
-                                없음
-                              </button>
-                            )}
+                    return (
+                      <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all duration-300 ${isEditing ? 'border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]' : 'border-gray-200'}`}>
+                        <div className="flex justify-between items-center mb-4 pb-3 border-b border-dashed">
+                          <div>
+                            <span className={`text-sm font-bold px-2.5 py-1 rounded-full mb-2 inline-block ${isRoulette ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
+                              {isRoulette ? '🎲 룰렛 게임' : '☕ 일반 주문'}
+                            </span>
+                            <div className="text-xs text-text-secondary">{dayjs(dateObj).format('YYYY.MM.DD HH:mm')}</div>
                           </div>
-                          <button onClick={() => setEditingId(isEditing ? null : h.id)} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isEditing ? 'bg-primary text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
-                            {isEditing ? <Check size={18} /> : <Pencil size={16} />}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        {items.map((item, idx) => {
-                          // 권한 체크: 결제자이거나, 내 이름이 포함된 메뉴여야 삭제 버튼 보임
-                          const isMyItem = item.orderedBy.includes(userName);
-                          const canDelete = isPayer || isMyItem;
-
-                          return (
-                            <div key={idx} className="flex justify-between items-center">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-sm text-text-primary">{item.menuName}<span className="text-xs font-normal text-text-secondary ml-1">x {item.count}</span></span>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.option === 'ICE' ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>{item.option === 'ONLY' ? '-' : item.option}</span>
-                                </div>
-                                <div className="flex flex-wrap gap-1 mt-1">{item.orderedBy.map((p, i) => <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">{p}</span>)}</div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <span className="text-sm font-bold text-text-primary">{(item.price * item.count).toLocaleString()}원</span>
-                                {isEditing && canDelete && (
-                                  <button
-                                    onClick={() => handleDeleteClick(h, h.type, item, idx)}
-                                    className="w-7 h-7 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right mr-1">
+                              <div className="text-xs text-text-secondary">{isRoulette ? '당첨자' : '결제자'}</div>
+                              {winner ? (
+                                <div className="font-bold text-primary text-base">{winner}</div>
+                              ) : (
+                                <button
+                                  onClick={() => setPayerTarget({ historyId: h.id, type: h.type, participants })}
+                                  className="font-bold text-base text-gray-400 underline decoration-dashed underline-offset-2 hover:text-primary transition-colors cursor-pointer"
+                                >
+                                  없음
+                                </button>
+                              )}
                             </div>
-                          );
-                        })}
+                            <button onClick={() => setEditingId(isEditing ? null : h.id)} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isEditing ? 'bg-primary text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
+                              {isEditing ? <Check size={18} /> : <Pencil size={16} />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          {items.map((item, idx) => {
+                            // 권한 체크: 결제자이거나, 내 이름이 포함된 메뉴여야 삭제 버튼 보임
+                            const isMyItem = item.orderedBy.includes(userName);
+                            const canDelete = isPayer || isMyItem;
+
+                            return (
+                              <div key={idx} className="flex justify-between items-center">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-text-primary">{item.menuName}<span className="text-xs font-normal text-text-secondary ml-1">x {item.count}</span></span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.option === 'ICE' ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>{item.option === 'ONLY' ? '-' : item.option}</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-1">{item.orderedBy.map((p, i) => <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">{p}</span>)}</div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm font-bold text-text-primary">{(item.price * item.count).toLocaleString()}원</span>
+                                  {isEditing && canDelete && (
+                                    <button
+                                      onClick={() => handleDeleteClick(h, h.type, item, idx)}
+                                      className="w-7 h-7 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {isEditing && (
+                          <button onClick={() => onAddMode(h.id, h.type)} className="w-full mt-4 py-3 bg-primary/10 text-primary rounded-xl font-bold text-sm hover:bg-primary/20 flex items-center justify-center gap-2"><Plus size={16} /> 메뉴 추가하기</button>
+                        )}
                       </div>
-                      {isEditing && (
-                        <button onClick={() => onAddMode(h.id, h.type)} className="w-full mt-4 py-3 bg-primary/10 text-primary rounded-xl font-bold text-sm hover:bg-primary/20 flex items-center justify-center gap-2"><Plus size={16} /> 메뉴 추가하기</button>
-                      )}
+                    );
+                  })}
+
+                  {/* 👇 페이지네이션 UI 고도화 */}
+                  {allHistory.length > ITEMS_PER_PAGE && (
+                    <div className="flex items-center justify-center gap-1.5 pt-2 pb-1">
+                      {/* << 첫 페이지 */}
+                      <button
+                        onClick={() => setCurrentPage(0)}
+                        disabled={currentPage === 0}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${currentPage === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100 hover:text-primary'}`}
+                      >
+                        <ChevronsLeft size={16} />
+                      </button>
+                      {/* < 이전 페이지 */}
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                        disabled={currentPage === 0}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${currentPage === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100 hover:text-primary'}`}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+
+                      {/* 숫자들 */}
+                      {(() => {
+                        const totalPages = Math.ceil(allHistory.length / ITEMS_PER_PAGE);
+                        const PAGE_GROUP_SIZE = 10;
+                        const currentGroup = Math.floor(currentPage / PAGE_GROUP_SIZE);
+                        const startPage = currentGroup * PAGE_GROUP_SIZE;
+                        const endPage = Math.min(startPage + PAGE_GROUP_SIZE, totalPages);
+
+                        return Array.from({ length: endPage - startPage }, (_, i) => startPage + i).map((pageNum) => (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-8 h-8 rounded-full text-xs font-bold transition-all ${currentPage === pageNum ? 'bg-primary text-white shadow-md' : 'text-gray-400 hover:bg-gray-100 hover:text-primary'}`}
+                          >
+                            {pageNum + 1}
+                          </button>
+                        ));
+                      })()}
+
+                      {/* > 다음 페이지 */}
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(allHistory.length / ITEMS_PER_PAGE) - 1, p + 1))}
+                        disabled={currentPage >= Math.ceil(allHistory.length / ITEMS_PER_PAGE) - 1}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${currentPage >= Math.ceil(allHistory.length / ITEMS_PER_PAGE) - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100 hover:text-primary'}`}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                      {/* >> 마지막 페이지 */}
+                      <button
+                        onClick={() => setCurrentPage(Math.ceil(allHistory.length / ITEMS_PER_PAGE) - 1)}
+                        disabled={currentPage >= Math.ceil(allHistory.length / ITEMS_PER_PAGE) - 1}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${currentPage >= Math.ceil(allHistory.length / ITEMS_PER_PAGE) - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100 hover:text-primary'}`}
+                      >
+                        <ChevronsRight size={16} />
+                      </button>
                     </div>
-                  );
-                })
+                  )}
+
+                  {/* 페이지 정보 표시 */}
+                  <p className="text-center text-xs text-text-secondary mb-4">
+                    총 {allHistory.length}건
+                    {allHistory.length > ITEMS_PER_PAGE && ` · ${currentPage + 1} / ${Math.ceil(allHistory.length / ITEMS_PER_PAGE)} 페이지`}
+                  </p>
+                </>
               )}
             </div>
           ) : (
