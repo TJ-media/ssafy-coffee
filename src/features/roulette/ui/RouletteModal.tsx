@@ -7,7 +7,6 @@ import { db } from '../../../firebase';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../../../shared/utils';
 import { Roulette } from '../game-engine/roulette';
 
-// 👇 인터페이스에 participants가 명시되어 있는지 확인하세요
 interface RouletteModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -42,8 +41,8 @@ const cartToHistoryItems = (cart: CartItem[]): HistoryItem[] => {
 };
 
 const RouletteModal: React.FC<RouletteModalProps> = ({
-                                                         isOpen, onClose, groupId, gameState, cart = [], marbleCounts = {}
-                                                     }) => {
+    isOpen, onClose, groupId, gameState, cart = [], marbleCounts = {}
+}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rouletteInstance = useRef<Roulette | null>(null);
     const isMountedRef = useRef(true);
@@ -129,6 +128,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
         } catch (e) { console.error('Failed to save roulette history:', e); }
     };
 
+    // 룰렛 초기화
     useEffect(() => {
         if (!isOpen) return;
         const initRoulette = async () => {
@@ -156,6 +156,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
         };
     }, [isOpen]);
 
+    // 참가자 변경시 마블 재설정
     useEffect(() => {
         if (!isRouletteReady || !rouletteInstance.current) return;
         if (!gameState?.participants || gameState.participants.length === 0) return;
@@ -165,6 +166,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
         setLocalFinished(false); setIsPlaying(false);
     }, [isRouletteReady, participantsKey, gameState?.seed, marbleCountsKey]);
 
+    // 카운트다운
     useEffect(() => {
         if (status !== 'ready') { setCountdown(null); return; }
         setCountdown(3);
@@ -184,6 +186,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
         return () => clearInterval(interval);
     }, [status, isHost, groupId]);
 
+    // 게임 시작 — 모든 클라이언트에서 동일한 결정론적 시뮬레이션 실행
     useEffect(() => {
         if (status === 'playing' && rouletteInstance.current && isRouletteReady && !isPlaying) {
             const participants = gameState?.participants || [];
@@ -194,6 +197,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
         }
     }, [status, isRouletteReady, marbleCounts, isPlaying]);
 
+    // 호스트만: goal 이벤트 → Firebase에 승자 기록
     useEffect(() => {
         if (!isHost || !rouletteInstance.current) return;
         const instance = rouletteInstance.current;
@@ -212,6 +216,16 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
         instance.addEventListener('goal', handleGoal);
         return () => { instance.removeEventListener('goal', handleGoal); };
     }, [groupId, isHost, localFinished, historySaved, cachedCart, marbleCounts, gameState?.participants]);
+
+    // 비호스트: Firebase에서 winner 수신 → 로컬 시뮬레이션 중단 + winner 표시
+    useEffect(() => {
+        if (isHost || !rouletteInstance.current) return;
+        if (status === 'finished' && gameState?.winner && !localFinished) {
+            rouletteInstance.current.setWinner(gameState.winner);
+            setIsPlaying(false);
+            setLocalFinished(true);
+        }
+    }, [isHost, status, gameState?.winner, localFinished]);
 
     if (!isOpen) return null;
 
@@ -248,7 +262,11 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
                     </div>
                     <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden">
                         <div className="flex-1 relative">
-                            <canvas ref={canvasRef} className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}></canvas>
+                            <canvas
+                                ref={canvasRef}
+                                className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}
+                            ></canvas>
+
                             {!isRouletteReady && (
                                 <div className="absolute inset-0 bg-gray-800 rounded-xl flex items-center justify-center">
                                     <div className="text-center text-gray-400">
@@ -257,6 +275,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
                                     </div>
                                 </div>
                             )}
+
                             {status === 'waiting' && isRouletteReady && (
                                 <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center p-4 h-full">
                                     <div className="bg-gray-800/95 rounded-2xl p-6 shadow-xl max-w-[320px] w-full border border-gray-600">
