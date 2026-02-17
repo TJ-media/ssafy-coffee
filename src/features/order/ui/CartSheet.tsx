@@ -1,6 +1,6 @@
 import { useMemo, RefObject } from 'react';
 import { CartItem, GroupedCartItem, OptionType } from '../../../shared/types';
-import { ShoppingCart, Trash2, ChevronDown, Plus, Minus } from 'lucide-react';
+import { ShoppingCart, CheckCircle, ChevronDown, Plus, Minus } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 
 interface Props {
@@ -17,9 +17,9 @@ interface Props {
 }
 
 const CartSheet = ({
-                       cart, totalPrice, userName, cartSheetRef,
-                       onRemove, onAdd, onClear, onClose
-                   }: Props) => {
+    cart, totalPrice, userName, cartSheetRef,
+    onRemove, onAdd, onClear, onClose
+}: Props) => {
 
     const groupedCart = useMemo(() => {
         return cart.reduce<Record<string, GroupedCartItem>>((acc, item) => {
@@ -63,7 +63,7 @@ const CartSheet = ({
                     <div className="flex items-center gap-3">
                         <span className="text-xl font-bold text-text-primary">{totalPrice.toLocaleString()}원</span>
                         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-                            <ChevronDown size={24} className="text-gray-400"/>
+                            <ChevronDown size={24} className="text-gray-400" />
                         </button>
                     </div>
                 </div>
@@ -81,7 +81,7 @@ const CartSheet = ({
                                         <span className="font-bold text-text-primary flex items-center gap-2">
                                             {info.menuName}
                                             <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${info.option === 'ICE' ? 'bg-blue-50 text-blue-500' : info.option === 'HOT' ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
-                                            {info.option === 'ONLY' ? '-' : info.option}
+                                                {info.option === 'ONLY' ? '-' : info.option}
                                             </span>
                                         </span>
                                         <span className="font-bold text-text-primary">{(info.price * info.count).toLocaleString()}원</span>
@@ -96,7 +96,7 @@ const CartSheet = ({
                                                     style={{ backgroundColor: getAvatarColor(name), color: getTextContrastColor() }}
                                                     title={name}
                                                 >
-                                                    {name.slice(0,1)}
+                                                    {name.slice(0, 1)}
                                                 </div>
                                             ))}
                                         </div>
@@ -107,7 +107,7 @@ const CartSheet = ({
                                                 disabled={!info.names.includes(userName)}
                                                 className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors"
                                             >
-                                                <Minus size={14}/>
+                                                <Minus size={14} />
                                             </button>
                                             <span className="w-8 text-center text-sm font-bold text-text-primary">{info.count}</span>
                                             <button
@@ -115,7 +115,7 @@ const CartSheet = ({
                                                 onClick={() => onAdd(info.menuName, info.price, info.option, '')}
                                                 className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
                                             >
-                                                <Plus size={14}/>
+                                                <Plus size={14} />
                                             </button>
                                         </div>
                                     </div>
@@ -130,7 +130,7 @@ const CartSheet = ({
                     disabled={cart.length === 0}
                     className={`w-full py-4 rounded-xl flex justify-center items-center gap-2 font-bold text-lg shrink-0 transition-colors ${cart.length > 0 ? 'bg-primary text-white hover:bg-primary-dark shadow-md' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                 >
-                    <Trash2 size={20} /> 결제 완료
+                    <CheckCircle size={20} /> 주문 완료
                 </button>
             </div>
         </>

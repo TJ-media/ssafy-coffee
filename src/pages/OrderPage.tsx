@@ -12,7 +12,7 @@ import RouletteModal from '../features/roulette/ui/RouletteModal';
 import SettingsModal from '../features/order/ui/SettingsModal';
 import Toast from '../shared/ui/Toast';
 import { updateHistoryApi, updateCartApi, addToCartApi } from '../features/order/api/firebaseApi';
-import { OrderHistory, RouletteHistory } from '../shared/types';
+import { OrderHistory, RouletteHistory, HistoryItem } from '../shared/types';
 
 const OrderPage = () => {
     const { state, actions } = useOrderLogic();
@@ -44,7 +44,7 @@ const OrderPage = () => {
     }, [selectedCategory]);
 
     const handleLogout = () => {
-        if(confirm('나가시겠습니까?')) {
+        if (confirm('나가시겠습니까?')) {
             localStorage.removeItem('ssafy_groupId');
             localStorage.removeItem('ssafy_userName');
             navigate('/');
@@ -92,10 +92,9 @@ const OrderPage = () => {
         actions.addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
     };
 
-    const handleDeleteItem = async (historyId: string, type: 'normal'|'roulette', index: number, targetUser?: string) => {
+    const handleDeleteItem = async (historyId: string, type: 'normal' | 'roulette', index: number, targetUser?: string) => {
         if (!state.groupId) return;
         const isNormal = type === 'normal';
-        // const list 타입을 명시하지 않으면 유니온 타입으로 추론되어 map 사용 시 에러가 발생할 수 있음
         const list = isNormal ? state.history : state.rouletteHistory;
         const targetIdx = list.findIndex(h => h.id === historyId);
         if (targetIdx === -1) return;
@@ -123,7 +122,6 @@ const OrderPage = () => {
             targetHistory.orderItems = items.filter((i: any) => i.count > 0);
         }
 
-        // 👇 수정된 부분: 타입 단언(Type Assertion)을 사용하여 명확하게 타입을 지정
         const updatedList = list.map((h, i) => i === targetIdx ? targetHistory : h);
 
         if (isNormal) {
@@ -133,6 +131,73 @@ const OrderPage = () => {
         }
 
         actions.addToast('삭제되었습니다');
+    };
+
+    // 👇 주문 완료 핸들러: 카트를 OrderHistory로 변환 후 저장, 카트 비움
+    const handleOrderComplete = async () => {
+        if (!state.groupId || state.cart.length === 0) return;
+        if (!confirm('정말 주문을 완료하시겠습니까?')) return;
+
+        try {
+            // 카트 아이템을 HistoryItem 형태로 그룹화
+            const itemMap: Record<string, HistoryItem> = {};
+            state.cart.forEach(cartItem => {
+                const key = `${cartItem.menuName}_${cartItem.option}`;
+                if (!itemMap[key]) {
+                    itemMap[key] = {
+                        menuName: cartItem.menuName,
+                        option: cartItem.option,
+                        price: cartItem.price,
+                        count: 0,
+                        orderedBy: []
+                    };
+                }
+                itemMap[key].count += 1;
+                itemMap[key].orderedBy.push(cartItem.userName);
+            });
+
+            const historyItems = Object.values(itemMap);
+            const participants = [...new Set(state.cart.map(c => c.userName))];
+
+            const newHistory: OrderHistory = {
+                id: Date.now().toString(),
+                orderedAt: new Date(),
+                totalPrice: state.totalPrice,
+                totalItems: state.cart.length,
+                items: historyItems,
+                participants,
+                winner: null
+            };
+
+            const updatedHistory = [newHistory, ...state.history];
+            await updateHistoryApi(state.groupId, updatedHistory, 'normal');
+            await updateCartApi(state.groupId, []);
+
+            actions.setIsCartOpen(false);
+            actions.addToast('주문이 완료되었습니다!', 'success');
+        } catch (e) {
+            console.error('주문 완료 실패:', e);
+            actions.addToast('주문 완료에 실패했습니다.', 'warning');
+        }
+    };
+
+    // 👇 결제자 업데이트 핸들러
+    const handleUpdateWinner = async (historyId: string, type: 'normal' | 'roulette', winner: string) => {
+        if (!state.groupId) return;
+        const isNormal = type === 'normal';
+        const list = isNormal ? [...state.history] : [...state.rouletteHistory];
+        const targetIdx = list.findIndex(h => h.id === historyId);
+        if (targetIdx === -1) return;
+
+        const updated = { ...list[targetIdx], winner };
+        list[targetIdx] = updated;
+
+        if (isNormal) {
+            await updateHistoryApi(state.groupId, list as OrderHistory[], 'normal');
+        } else {
+            await updateHistoryApi(state.groupId, list as RouletteHistory[], 'roulette');
+        }
+        actions.addToast(`${winner}님이 결제자로 지정되었습니다.`, 'success');
     };
 
     return (
@@ -159,6 +224,7 @@ const OrderPage = () => {
                 userName={state.userName}
                 onAddMode={handleHistoryAddMode}
                 onDeleteItem={handleDeleteItem}
+                onUpdateWinner={handleUpdateWinner}
             />
 
             <RouletteModal
@@ -221,15 +287,15 @@ const OrderPage = () => {
                     }}
                     className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform active:scale-95 
                   ${state.editingHistoryInfo
-                        ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
-                        : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
+                            ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
+                            : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
                 >
                     <div className="relative">
-                        {state.editingHistoryInfo ? <Pencil size={28}/> : <ShoppingCart size={28}/>}
+                        {state.editingHistoryInfo ? <Pencil size={28} /> : <ShoppingCart size={28} />}
                         {(state.editingHistoryInfo ? state.editingHistoryInfo.count : state.cart.length) > 0 && (
                             <span className="absolute -top-2 -right-2 bg-danger text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white">
-                {state.editingHistoryInfo ? state.editingHistoryInfo.count : state.cart.length}
-              </span>
+                                {state.editingHistoryInfo ? state.editingHistoryInfo.count : state.cart.length}
+                            </span>
                         )}
                     </div>
                 </button>
@@ -249,13 +315,9 @@ const OrderPage = () => {
                     onAdd={async (name, price, option, category) => {
                         if (state.groupId) await addToCartApi(state.groupId, { id: Date.now(), userName: state.userName, menuName: name, price, option, category: category || '' });
                     }}
-                    onClear={async () => {
-                        if (confirm('정말 결제 완료하시겠습니까?')) {
-                            // 결제 로직
-                        }
-                    }}
+                    onClear={handleOrderComplete}
                     onClose={() => actions.setIsCartOpen(false)}
-                    onEdit={() => {}}
+                    onEdit={() => { }}
                 />
             )}
         </div>
