@@ -63,13 +63,13 @@ const OrderHeader: React.FC<Props> = ({
     return (
         <div className="bg-surface sticky top-0 z-10 shadow-sm">
             <div className="flex justify-between items-center p-6 pb-2">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-inner" style={{ backgroundColor: getAvatarColor(userName), color: getTextContrastColor() }}>
-                        {userName.slice(0, 2)}
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shadow-inner shrink-0" style={{ backgroundColor: getAvatarColor(userName), color: getTextContrastColor() }}>
+                        {userName.slice(0, 3)}
                     </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-text-primary">메가커피</h2>
-                        <p className="text-xs text-text-secondary">{groupId}</p>
+                    <div className="min-w-0">
+                        <h2 className="text-lg font-bold text-text-primary">메가커피</h2>
+                        <p className="text-xs text-text-secondary truncate">{groupId}</p>
                     </div>
                 </div>
                 <div className="flex items-start gap-0.5">
