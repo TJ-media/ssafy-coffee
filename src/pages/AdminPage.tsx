@@ -6,6 +6,8 @@ import {
     fetchOldGroups,
     fetchAllGroups,
     deleteGroup,
+    fetchSuperAdminPassword,
+    updateSuperAdminPassword,
     SystemStats,
     GroupInfo,
 } from '../features/admin/api/adminApi';
@@ -26,12 +28,36 @@ import {
     Calendar,
     Clock,
     Loader2,
+    Shield,
+    Lock,
+    Eye,
+    EyeOff,
+    KeyRound,
+    LogOut,
 } from 'lucide-react';
 
 type TabType = 'notice' | 'stats' | 'cleanup';
 
+const SESSION_KEY = 'ssafy_super_admin_auth';
+
 const AdminPage = () => {
     const navigate = useNavigate();
+
+    // ─── 인증 상태 ───
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [loginError, setLoginError] = useState('');
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+    // ─── 비밀번호 변경 상태 ───
+    const [showPasswordChange, setShowPasswordChange] = useState(false);
+    const [currentPwInput, setCurrentPwInput] = useState('');
+    const [newPwInput, setNewPwInput] = useState('');
+    const [newPwConfirm, setNewPwConfirm] = useState('');
+    const [isChangingPw, setIsChangingPw] = useState(false);
+
     const [activeTab, setActiveTab] = useState<TabType>('notice');
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -57,6 +83,87 @@ const AdminPage = () => {
     const removeToast = useCallback((id: string) => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
     }, []);
+
+    // ─── 세션 체크: 이미 인증된 상태인지 확인 ───
+    useEffect(() => {
+        const sessionAuth = sessionStorage.getItem(SESSION_KEY);
+        if (sessionAuth === 'true') {
+            setIsAuthenticated(true);
+        }
+        setIsCheckingAuth(false);
+    }, []);
+
+    // ─── 로그인 핸들러 ───
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!passwordInput.trim()) {
+            setLoginError('비밀번호를 입력해주세요.');
+            return;
+        }
+
+        setIsLoggingIn(true);
+        setLoginError('');
+
+        try {
+            const correctPassword = await fetchSuperAdminPassword();
+            if (passwordInput === correctPassword) {
+                setIsAuthenticated(true);
+                sessionStorage.setItem(SESSION_KEY, 'true');
+            } else {
+                setLoginError('비밀번호가 일치하지 않습니다.');
+                setPasswordInput('');
+            }
+        } catch (err) {
+            console.error('로그인 실패:', err);
+            setLoginError('서버 연결에 실패했습니다. 다시 시도해주세요.');
+        } finally {
+            setIsLoggingIn(false);
+        }
+    };
+
+    // ─── 로그아웃 핸들러 ───
+    const handleLogout = () => {
+        sessionStorage.removeItem(SESSION_KEY);
+        setIsAuthenticated(false);
+        setPasswordInput('');
+    };
+
+    // ─── 비밀번호 변경 핸들러 ───
+    const handleChangePassword = async () => {
+        if (!currentPwInput || !newPwInput || !newPwConfirm) {
+            addToast('모든 항목을 입력해주세요.', 'warning');
+            return;
+        }
+        if (newPwInput !== newPwConfirm) {
+            addToast('새 비밀번호가 일치하지 않습니다.', 'warning');
+            return;
+        }
+        if (newPwInput.length < 4) {
+            addToast('비밀번호는 4자리 이상이어야 합니다.', 'warning');
+            return;
+        }
+
+        setIsChangingPw(true);
+        try {
+            const correctPassword = await fetchSuperAdminPassword();
+            if (currentPwInput !== correctPassword) {
+                addToast('현재 비밀번호가 일치하지 않습니다.', 'warning');
+                return;
+            }
+
+            await updateSuperAdminPassword(newPwInput);
+            addToast('비밀번호가 변경되었습니다!', 'success');
+            setShowPasswordChange(false);
+            setCurrentPwInput('');
+            setNewPwInput('');
+            setNewPwConfirm('');
+        } catch (err) {
+            console.error('비밀번호 변경 실패:', err);
+            addToast('비밀번호 변경에 실패했습니다.', 'warning');
+        } finally {
+            setIsChangingPw(false);
+        }
+    };
 
     // ─── 통계 로드 ───
     const loadStats = useCallback(async () => {
@@ -89,12 +196,13 @@ const AdminPage = () => {
 
     // 탭 변경 시 데이터 로드
     useEffect(() => {
+        if (!isAuthenticated) return;
         if (activeTab === 'stats') {
             loadStats();
         } else if (activeTab === 'cleanup') {
             loadOldGroups();
         }
-    }, [activeTab, loadStats, loadOldGroups]);
+    }, [activeTab, isAuthenticated, loadStats, loadOldGroups]);
 
     // ─── 공지 전송 핸들러 ───
     const handleSendNotice = async () => {
@@ -208,9 +316,176 @@ const AdminPage = () => {
         { key: 'cleanup', label: '방 청소', icon: <Trash2 size={18} /> },
     ];
 
+    // ─── 세션 체크 중 로딩 ───
+    if (isCheckingAuth) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <Loader2 size={32} className="animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════
+    // ─── 로그인 게이트 (미인증 상태) ───
+    // ═══════════════════════════════════════════
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center p-4">
+                <Toast toasts={toasts} removeToast={removeToast} />
+
+                <div className="w-full max-w-sm">
+                    {/* 로고 영역 */}
+                    <div className="text-center mb-8">
+                        <div className="w-20 h-20 bg-white rounded-2xl shadow-toss flex items-center justify-center mx-auto mb-4">
+                            <Shield size={40} className="text-primary" />
+                        </div>
+                        <h1 className="text-2xl font-extrabold text-text-primary mb-1">슈퍼관리자</h1>
+                        <p className="text-sm text-text-secondary">관리자 비밀번호를 입력해주세요</p>
+                    </div>
+
+                    {/* 로그인 카드 */}
+                    <div className="bg-white rounded-2xl shadow-toss p-6">
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div className="relative">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary">
+                                    <Lock size={18} />
+                                </div>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={passwordInput}
+                                    onChange={(e) => {
+                                        setPasswordInput(e.target.value);
+                                        setLoginError('');
+                                    }}
+                                    placeholder="비밀번호 입력"
+                                    className={`w-full pl-11 pr-11 py-4 bg-background rounded-xl focus:outline-none focus:ring-2 transition text-text-primary ${loginError ? 'ring-2 ring-danger/50' : 'focus:ring-primary/50'
+                                        }`}
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary transition"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+
+                            {loginError && (
+                                <p className="text-xs text-danger flex items-center gap-1 ml-1">
+                                    <AlertTriangle size={12} />
+                                    {loginError}
+                                </p>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={isLoggingIn || !passwordInput.trim()}
+                                className="w-full bg-primary text-white py-4 rounded-xl font-bold text-base hover:bg-primary-dark transition flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md shadow-primary/20"
+                            >
+                                {isLoggingIn ? (
+                                    <>
+                                        <Loader2 size={20} className="animate-spin" />
+                                        확인 중...
+                                    </>
+                                ) : (
+                                    <>
+                                        <KeyRound size={20} />
+                                        입장하기
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* 안내 텍스트 */}
+                    <p className="text-center text-xs text-text-secondary mt-4">
+                        초기 비밀번호는 <span className="font-bold text-primary">0000</span> 입니다
+                    </p>
+
+                    <button
+                        onClick={() => navigate('/')}
+                        className="block mx-auto mt-4 text-sm text-text-secondary underline hover:text-text-primary transition"
+                    >
+                        메인으로 돌아가기
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════
+    // ─── 대시보드 (인증 완료 후) ───
+    // ═══════════════════════════════════════════
     return (
         <div className="min-h-screen bg-background">
             <Toast toasts={toasts} removeToast={removeToast} />
+
+            {/* ─── 비밀번호 변경 모달 ─── */}
+            {showPasswordChange && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm animate-fade-in-up">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                                <KeyRound size={22} className="text-primary" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-text-primary">비밀번호 변경</h2>
+                                <p className="text-xs text-text-secondary">슈퍼관리자 비밀번호를 변경합니다</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <input
+                                type="password"
+                                placeholder="현재 비밀번호"
+                                value={currentPwInput}
+                                onChange={(e) => setCurrentPwInput(e.target.value)}
+                                className="w-full p-3 bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition text-sm"
+                            />
+                            <input
+                                type="password"
+                                placeholder="새 비밀번호 (4자리 이상)"
+                                value={newPwInput}
+                                onChange={(e) => setNewPwInput(e.target.value)}
+                                className="w-full p-3 bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition text-sm"
+                            />
+                            <input
+                                type="password"
+                                placeholder="새 비밀번호 확인"
+                                value={newPwConfirm}
+                                onChange={(e) => setNewPwConfirm(e.target.value)}
+                                className="w-full p-3 bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition text-sm"
+                            />
+                        </div>
+
+                        <div className="flex gap-2 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowPasswordChange(false);
+                                    setCurrentPwInput('');
+                                    setNewPwInput('');
+                                    setNewPwConfirm('');
+                                }}
+                                className="flex-1 py-3 rounded-xl border border-gray-200 text-text-secondary font-medium text-sm hover:bg-gray-50 transition"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleChangePassword}
+                                disabled={isChangingPw}
+                                className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary-dark transition disabled:bg-gray-300 flex items-center justify-center gap-1"
+                            >
+                                {isChangingPw ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    '변경하기'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ─── 헤더 ─── */}
             <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
@@ -228,9 +503,23 @@ const AdminPage = () => {
                                 <p className="text-xs text-text-secondary">시스템 관리 대시보드</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-text-secondary bg-gray-50 px-3 py-1.5 rounded-full">
-                            <Activity size={14} className="text-secondary" />
-                            <span>관리자 모드</span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowPasswordChange(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-gray-100 rounded-full transition"
+                                title="비밀번호 변경"
+                            >
+                                <KeyRound size={14} />
+                                비밀번호 변경
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-danger bg-red-50 hover:bg-red-100 rounded-full transition"
+                                title="로그아웃"
+                            >
+                                <LogOut size={14} />
+                                로그아웃
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -245,8 +534,8 @@ const AdminPage = () => {
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.key
-                                        ? 'bg-primary text-white shadow-md shadow-primary/20'
-                                        : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
+                                    ? 'bg-primary text-white shadow-md shadow-primary/20'
+                                    : 'text-text-secondary hover:bg-gray-100 hover:text-text-primary'
                                     }`}
                             >
                                 {tab.icon}
