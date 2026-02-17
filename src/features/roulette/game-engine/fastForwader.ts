@@ -1,6 +1,7 @@
 import { RenderParameters } from './rouletteRenderer.ts';
 import { Rect } from './types/rect.type.ts';
 import { MouseEventArgs, UIObject } from './UIObject.ts';
+import ffImg from '../../../assets/images/ff.svg';
 
 export class FastForwader implements UIObject {
   private bound: Rect = {
@@ -16,7 +17,7 @@ export class FastForwader implements UIObject {
     this.canvas = canvas;
     this.icon = new Image();
     // 👇 [중요] 이미지 경로 수정 (상대 경로가 맞아야 에러가 안 남)
-    this.icon.src = new URL('../../../../assets/images/ff.svg', import.meta.url).toString();
+    this.icon.src = ffImg;
 
     this.attachEvents();
   }
@@ -51,7 +52,7 @@ export class FastForwader implements UIObject {
     window.removeEventListener('mouseup', this.onInputUp);
   }
 
-  update(_deltaTime: number): void {}
+  update(_deltaTime: number): void { }
 
   render(ctx: CanvasRenderingContext2D, _params: RenderParameters, width: number, height: number): void {
     this.bound.w = width / 2;
@@ -82,6 +83,6 @@ export class FastForwader implements UIObject {
     return this.bound;
   }
 
-  onMouseDown?(_e?: MouseEventArgs): void {}
-  onMouseUp?(_e?: MouseEventArgs): void {}
+  onMouseDown?(_e?: MouseEventArgs): void { }
+  onMouseUp?(_e?: MouseEventArgs): void { }
 }
