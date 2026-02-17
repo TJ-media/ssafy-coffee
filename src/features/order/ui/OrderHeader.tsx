@@ -72,12 +72,32 @@ const OrderHeader: React.FC<Props> = ({
                         <p className="text-xs text-text-secondary">{groupId}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1">
-                    <button onClick={onCopyLink} className="p-2 hover:text-primary"><Link size={20} /></button>
-                    <button onClick={onOpenHistory} className="p-2 hover:text-primary"><History size={20} /></button>
-                    <button onClick={onOpenPinball} className="p-2 hover:text-primary"><Target size={20} /></button>
-                    <button onClick={onOpenSettings} className="p-2 hover:text-primary"><Settings size={20} /></button>
-                    <button onClick={onLogout} className="p-2 hover:text-danger"><LogOut size={20} /></button>
+                <div className="flex items-start gap-0.5">
+                    <button onClick={onCopyLink} className="relative group flex flex-col items-center px-1.5 py-1 hover:text-primary transition-colors rounded-lg hover:bg-gray-50">
+                        <Link size={18} />
+                        <span className="text-[9px] mt-0.5 text-text-secondary group-hover:text-primary">초대</span>
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">초대 링크 복사</span>
+                    </button>
+                    <button onClick={onOpenHistory} className="relative group flex flex-col items-center px-1.5 py-1 hover:text-primary transition-colors rounded-lg hover:bg-gray-50">
+                        <History size={18} />
+                        <span className="text-[9px] mt-0.5 text-text-secondary group-hover:text-primary">내역</span>
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">주문 내역 보기</span>
+                    </button>
+                    <button onClick={onOpenPinball} className="relative group flex flex-col items-center px-1.5 py-1 hover:text-primary transition-colors rounded-lg hover:bg-gray-50">
+                        <Target size={18} />
+                        <span className="text-[9px] mt-0.5 text-text-secondary group-hover:text-primary">게임</span>
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">커피 내기 게임</span>
+                    </button>
+                    <button onClick={onOpenSettings} className="relative group flex flex-col items-center px-1.5 py-1 hover:text-primary transition-colors rounded-lg hover:bg-gray-50">
+                        <Settings size={18} />
+                        <span className="text-[9px] mt-0.5 text-text-secondary group-hover:text-primary">설정</span>
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">그룹 설정</span>
+                    </button>
+                    <button onClick={onLogout} className="relative group flex flex-col items-center px-1.5 py-1 hover:text-danger transition-colors rounded-lg hover:bg-red-50">
+                        <LogOut size={18} />
+                        <span className="text-[9px] mt-0.5 text-text-secondary group-hover:text-danger">나가기</span>
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">방에서 나가기</span>
+                    </button>
                 </div>
             </div>
 
