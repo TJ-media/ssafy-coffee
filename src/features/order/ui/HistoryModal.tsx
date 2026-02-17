@@ -13,9 +13,10 @@ interface Props {
   userName: string;
   onAddMode: (historyId: string, type: 'normal' | 'roulette') => void;
   onDeleteItem: (historyId: string, type: 'normal' | 'roulette', itemIndex: number, targetUser?: string) => void;
+  onUpdateWinner: (historyId: string, type: 'normal' | 'roulette', winner: string) => void;
 }
 
-const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onAddMode, onDeleteItem }: Props) => {
+const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onAddMode, onDeleteItem, onUpdateWinner }: Props) => {
   const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [coffeePrice, setCoffeePrice] = useState<string>('4500');
@@ -27,6 +28,13 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
     itemIndex: number;
     participants: string[];
     menuName: string;
+  } | null>(null);
+
+  // 👇 결제자 선택 모달 상태
+  const [payerTarget, setPayerTarget] = useState<{
+    historyId: string;
+    type: 'normal' | 'roulette';
+    participants: string[];
   } | null>(null);
 
   // --- 통계 계산 로직 ---
@@ -146,10 +154,9 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
     idx: number
   ) => {
     const isRoulette = type === 'roulette';
-    const winner = isRoulette ? (hItem as RouletteHistory).winner : '';
-    // 당첨자(결제자)인지 확인 (일반 주문은 결제자 개념이 없으므로 누구나 삭제 가능하게 하거나 본인만 가능하게 처리)
-    // 여기서는 룰렛 당첨자만 특권(모두 삭제 가능)을 가짐
-    const isPayer = isRoulette && winner === userName;
+    const winner = isRoulette ? (hItem as RouletteHistory).winner : (hItem as OrderHistory).winner || '';
+    // 결제자인지 확인
+    const isPayer = winner === userName;
 
     // 결제자가 2명 이상인 메뉴를 삭제하려고 할 때 -> 모달 띄움
     if (isPayer && item.orderedBy.length > 1) {
@@ -159,15 +166,11 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
       return;
     }
 
-    // 그 외 (본인 메뉴 삭제 or 결제자가 1명인 메뉴 삭제) -> 바로 삭제 (targetUser를 본인으로 지정하지 않음 -> 전체 삭제 or 로직 위임)
-    // 단, 본인이 본인걸 지울때는 targetUser를 지정해야 함.
-    // 기존 로직: targetUser가 있으면 그 사람만 뺌. 없으면 통으로 뺌.
-
-    // 1. 결제자면 -> targetUser 없이 호출 (통 삭제, 단 위에서 2명 이상은 걸렀으므로 1명인 경우임)
+    // 그 외 (본인 메뉴 삭제 or 결제자가 1명인 메뉴 삭제) -> 바로 삭제
     if (isPayer) {
       onDeleteItem(hItem.id, type, idx, undefined);
     } else {
-      // 2. 결제자가 아니면 -> 본인 이름(userName)을 targetUser로 넘겨서 "나만 빠지기" 시도
+      // 결제자가 아니면 -> 본인 이름(userName)을 targetUser로 넘겨서 "나만 빠지기" 시도
       onDeleteItem(hItem.id, type, idx, userName);
     }
   };
@@ -230,12 +233,13 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
                   const date = h.type === 'normal' ? (h as OrderHistory).orderedAt : (h as RouletteHistory).playedAt;
                   const dateObj = date?.toDate ? date.toDate() : new Date(date);
                   const isRoulette = h.type === 'roulette';
-                  const winner = isRoulette ? (h as RouletteHistory).winner : null;
+                  const winner = isRoulette ? (h as RouletteHistory).winner : (h as OrderHistory).winner;
                   const items = isRoulette ? (h as RouletteHistory).orderItems : (h as OrderHistory).items;
+                  const participants = h.participants || [];
                   const isEditing = editingId === h.id;
 
-                  // 👇 [복구] 결제자인지 확인
-                  const isPayer = isRoulette && winner === userName;
+                  // 결제자인지 확인
+                  const isPayer = winner === userName;
 
                   return (
                     <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all duration-300 ${isEditing ? 'border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]' : 'border-gray-200'}`}>
@@ -247,12 +251,19 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
                           <div className="text-xs text-text-secondary">{dayjs(dateObj).format('YYYY.MM.DD HH:mm')}</div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isRoulette && (
-                            <div className="text-right mr-1">
-                              <div className="text-xs text-text-secondary">당첨자</div>
+                          <div className="text-right mr-1">
+                            <div className="text-xs text-text-secondary">결제자</div>
+                            {winner ? (
                               <div className="font-bold text-primary text-base">{winner}</div>
-                            </div>
-                          )}
+                            ) : (
+                              <button
+                                onClick={() => setPayerTarget({ historyId: h.id, type: h.type, participants })}
+                                className="font-bold text-base text-gray-400 underline decoration-dashed underline-offset-2 hover:text-primary transition-colors cursor-pointer"
+                              >
+                                없음
+                              </button>
+                            )}
+                          </div>
                           <button onClick={() => setEditingId(isEditing ? null : h.id)} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isEditing ? 'bg-primary text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
                             {isEditing ? <Check size={18} /> : <Pencil size={16} />}
                           </button>
@@ -260,7 +271,7 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
                       </div>
                       <div className="space-y-3">
                         {items.map((item, idx) => {
-                          // 👇 [복구] 권한 체크: 결제자이거나, 내 이름이 포함된 메뉴여야 삭제 버튼 보임
+                          // 권한 체크: 결제자이거나, 내 이름이 포함된 메뉴여야 삭제 버튼 보임
                           const isMyItem = item.orderedBy.includes(userName);
                           const canDelete = isPayer || isMyItem;
 
@@ -479,6 +490,44 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
             </div>
             <button
               onClick={() => setDeleteTarget(null)}
+              className="w-full mt-6 py-2 text-sm text-gray-400 hover:text-gray-600 underline"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 👇 결제자 선택 모달 */}
+      {payerTarget && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
+          <div className="bg-white p-6 rounded-2xl shadow-xl w-64 animate-bounce-in">
+            <h3 className="text-center font-bold text-lg mb-2">결제자를 선택하세요</h3>
+            <p className="text-center text-xs text-text-secondary mb-4">누가 결제했나요?</p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              {payerTarget.participants.map((p, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    onUpdateWinner(payerTarget.historyId, payerTarget.type, p);
+                    setPayerTarget(null);
+                  }}
+                  className="flex flex-col items-center gap-1 group transition-transform hover:scale-110"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center shadow-md border-2 border-white text-sm font-bold group-hover:ring-2 group-hover:ring-primary transition-all"
+                    style={{ backgroundColor: getAvatarColor(p), color: getTextContrastColor() }}
+                  >
+                    {p.slice(0, 1)}
+                  </div>
+                  <span className="text-xs font-medium text-text-primary group-hover:text-primary group-hover:font-bold">
+                    {p}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPayerTarget(null)}
               className="w-full mt-6 py-2 text-sm text-gray-400 hover:text-gray-600 underline"
             >
               취소
