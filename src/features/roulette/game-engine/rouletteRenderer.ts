@@ -8,6 +8,12 @@ import { UIObject } from './UIObject.ts';
 import { VectorLike } from './types/VectorLike.ts';
 import { MapEntityState } from './types/MapEntity.type.ts';
 import { ColorTheme } from './types/ColorTheme.ts';
+import chamruImg from '../../../assets/images/chamru.png';
+import kubinImg from '../../../assets/images/kubin.png';
+import kkwakImg from '../../../assets/images/kkwak.png';
+import junyoopImg from '../../../assets/images/junyoop.png';
+import waldokunImg from '../../../assets/images/waldokun.png';
+import ffImg from '../../../assets/images/ff.svg';
 
 export type RenderParameters = {
   camera: Camera;
@@ -101,21 +107,21 @@ export class RouletteRenderer {
     console.log('RouletteRenderer: _load method called, loading images...');
     const loadPromises =
       [
-        { name: '챔루', imgUrl: new URL('../../assets/images/chamru.png', import.meta.url) },
-        { name: '쿠빈', imgUrl: new URL('../../assets/images/kubin.png', import.meta.url) },
-        { name: '꽉변', imgUrl: new URL('../../assets/images/kkwak.png', import.meta.url) },
-        { name: '꽉변호사', imgUrl: new URL('../../assets/images/kkwak.png', import.meta.url) },
-        { name: '꽉 변호사', imgUrl: new URL('../../assets/images/kkwak.png', import.meta.url) },
-        { name: '주누피', imgUrl: new URL('../../assets/images/junyoop.png', import.meta.url) },
-        { name: '왈도쿤', imgUrl: new URL('../../assets/images/waldokun.png', import.meta.url) },
+        { name: '챔루', imgUrl: chamruImg },
+        { name: '쿠빈', imgUrl: kubinImg },
+        { name: '꽉변', imgUrl: kkwakImg },
+        { name: '꽉변호사', imgUrl: kkwakImg },
+        { name: '꽉 변호사', imgUrl: kkwakImg },
+        { name: '주누피', imgUrl: junyoopImg },
+        { name: '왈도쿤', imgUrl: waldokunImg },
       ].map(({ name, imgUrl }) => {
         return (async () => {
-          this._images[name] = await this._loadImage(imgUrl.toString());
+          this._images[name] = await this._loadImage(imgUrl);
         })();
       });
 
     loadPromises.push((async () => {
-      await this._loadImage(new URL('../../assets/images/ff.svg', import.meta.url).toString());
+      await this._loadImage(ffImg);
     })());
 
     await Promise.all(loadPromises);
@@ -200,12 +206,12 @@ export class RouletteRenderer {
   }
 
   private renderMarbles({
-                          marbles,
-                          camera,
-                          winnerRank,
-                          winners,
-                          size,
-                        }: RenderParameters) {
+    marbles,
+    camera,
+    winnerRank,
+    winners,
+    size,
+  }: RenderParameters) {
     const winnerIndex = winnerRank - winners.length;
 
     const viewPort = { x: camera.x, y: camera.y, w: size.x, h: size.y, zoom: camera.zoom * initialZoom };
