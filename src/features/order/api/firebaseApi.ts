@@ -1,4 +1,4 @@
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CartItem, Menu, OrderHistory, RouletteHistory } from '../../../shared/types';
 
@@ -28,6 +28,19 @@ export const updateHistoryApi = async (groupId: string, newHistory: OrderHistory
 
 export const startRouletteGameApi = async (groupId: string, participants: string[], hostName: string) => {
     const groupRef = doc(db, 'groups', groupId);
+
+    // 기존 marbleCounts 읽기 (누적된 공 개수 보존)
+    const docSnap = await getDoc(groupRef);
+    const existingCounts = (docSnap.data()?.marbleCounts || {}) as { [key: string]: number };
+
+    // 새 참가자만 기본값 1로 설정, 기존 참가자는 기존 값 유지
+    const updatedCounts: { [key: string]: number } = { ...existingCounts };
+    participants.forEach(name => {
+        if (!(name in updatedCounts)) {
+            updatedCounts[name] = 1;
+        }
+    });
+
     await updateDoc(groupRef, {
         rouletteGame: {
             status: 'waiting',
@@ -37,8 +50,7 @@ export const startRouletteGameApi = async (groupId: string, participants: string
             chatMessages: [],
             hostName
         },
-        // 게임 시작 시 해당 유저들의 구슬 카운트 초기화 (없으면 0)
-        marbleCounts: {}
+        marbleCounts: updatedCounts
     });
 };
 
