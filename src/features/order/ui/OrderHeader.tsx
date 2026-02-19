@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, History, Target, LogOut, Heart, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
-import { CATEGORIES } from '../../../menuData';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 
 interface Props {
@@ -11,16 +10,17 @@ interface Props {
     onSelectCategory: (cat: string) => void;
     onSelectSubCategory: (sub: string) => void;
     subCategories: string[];
+    categories: string[];
     onOpenHistory: () => void;
     onOpenPinball: () => void;
-    onOpenSettings: () => void; // 👇 추가
+    onOpenSettings: () => void;
     onCopyLink: () => void;
     onLogout: () => void;
 }
 
 const OrderHeader: React.FC<Props> = ({
     groupId, userName, selectedCategory, selectedSubCategory,
-    onSelectCategory, onSelectSubCategory, subCategories,
+    onSelectCategory, onSelectSubCategory, subCategories, categories,
     onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout
 }) => {
     const categoryScrollRef = useRef<HTMLDivElement>(null);
@@ -106,7 +106,7 @@ const OrderHeader: React.FC<Props> = ({
                 {canScrollCatLeft && <button onClick={() => scrollContainer(categoryScrollRef, 'left')} className="absolute left-0 top-0 bottom-2 z-10 w-14 bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-3 text-gray-400 hover:text-primary transition-colors"><ChevronLeft size={24} /></button>}
                 <div ref={categoryScrollRef} onScroll={() => checkScroll(categoryScrollRef, setCanScrollCatLeft, setCanScrollCatRight)} className="flex overflow-x-auto space-x-2 no-scrollbar">
                     <button onClick={() => onSelectCategory('즐겨찾기')} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap flex items-center gap-1 shrink-0 ${selectedCategory === '즐겨찾기' ? 'bg-primary text-white shadow-md' : 'bg-white hover:bg-gray-50'}`}><Heart size={14} fill={selectedCategory === '즐겨찾기' ? 'white' : 'none'} /> 즐겨찾기</button>
-                    {CATEGORIES.map(cat => (
+                    {categories.map(cat => (
                         <button key={cat} onClick={() => onSelectCategory(cat)} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap shrink-0 ${selectedCategory === cat ? 'bg-primary text-white shadow-md' : 'bg-white hover:bg-gray-50'}`}>{cat}</button>
                     ))}
                 </div>

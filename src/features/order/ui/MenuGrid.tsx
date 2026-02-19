@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { MEGA_MENUS } from '../../../menuData';
 import { Menu, OptionType } from '../../../shared/types';
 import { Heart, Plus, Coffee, History, Trash2, Snowflake, Flame } from 'lucide-react';
 
@@ -10,6 +9,7 @@ interface Props {
     onAddToCart: (e: React.MouseEvent, menu: Menu, option: OptionType) => void;
     onToggleFavorite: (menu: Menu) => void;
     onMenuSelect: (menu: Menu) => void;
+    menus: Menu[];
     customMenus: Menu[];
     onSaveCustomMenu: (menu: Menu) => void;
     onDeleteCustomMenu: (id: number) => void;
@@ -18,7 +18,7 @@ interface Props {
 const MenuGrid: React.FC<Props> = ({
     selectedCategory, selectedSubCategory, favoriteMenuIds,
     onAddToCart, onToggleFavorite, onMenuSelect,
-    customMenus, onSaveCustomMenu, onDeleteCustomMenu
+    menus, customMenus, onSaveCustomMenu, onDeleteCustomMenu
 }) => {
     const [customName, setCustomName] = useState('');
     const [customPrice, setCustomPrice] = useState('');
@@ -192,10 +192,10 @@ const MenuGrid: React.FC<Props> = ({
     }
 
     // 2. 즐겨찾기 탭 로직 
-    const favoriteMenus = MEGA_MENUS.filter(m => favoriteMenuIds.includes(m.id));
+    const favoriteMenus = menus.filter(m => favoriteMenuIds.includes(m.id));
     const currentMenus = selectedCategory === '즐겨찾기'
         ? favoriteMenus
-        : MEGA_MENUS.filter(m => m.categoryUpper === selectedCategory);
+        : menus.filter(m => m.categoryUpper === selectedCategory);
 
     if (selectedCategory === '즐겨찾기' && favoriteMenus.length === 0) {
         return (
