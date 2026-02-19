@@ -18,6 +18,7 @@ export const useOrderLogic = () => {
   const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
   const [rouletteGame, setRouletteGame] = useState<RouletteGameState | undefined>(undefined);
   const [marbleCounts, setMarbleCounts] = useState<{ [userName: string]: number }>({});
+  const [password, setPassword] = useState<string>('');
 
   // 👇 추가: 모든 유저의 커스텀 메뉴 맵, 내 커스텀 메뉴 리스트
   const [allCustomMenus, setAllCustomMenus] = useState<{ [key: string]: Menu[] }>({});
@@ -63,6 +64,7 @@ export const useOrderLogic = () => {
         setRouletteHistory(data.rouletteHistory || []);
         setRouletteGame(data.rouletteGame);
         setMarbleCounts(data.marbleCounts || {});
+        setPassword(data.password || '');
 
         // 👇 추가: 커스텀 메뉴 동기화
         const loadedCustomMenus = data.customMenus || {};
@@ -93,7 +95,7 @@ export const useOrderLogic = () => {
     return () => unsub();
   }, [groupId, userName, navigate, editingHistoryInfo?.id]);
 
-  const addToast = (message: string, type: 'info'|'success'|'warning' = 'info') => {
+  const addToast = (message: string, type: 'info' | 'success' | 'warning' = 'info') => {
     setToasts(prev => [...prev, { id: Math.random().toString(), message, type }]);
   };
 
@@ -253,8 +255,8 @@ export const useOrderLogic = () => {
   };
 
   const isRouletteModalOpen = !!rouletteGame
-      && rouletteGame.status !== 'idle'
-      && !(rouletteGame.status === 'finished' && isResultDismissed);
+    && rouletteGame.status !== 'idle'
+    && !(rouletteGame.status === 'finished' && isResultDismissed);
 
   return {
     state: {
@@ -262,7 +264,8 @@ export const useOrderLogic = () => {
       rouletteGame, marbleCounts, toasts, favoriteMenuIds,
       isCartOpen, isHistoryOpen, editingHistoryInfo,
       isRouletteModalOpen,
-      myCustomMenus // 👇 내 커스텀 메뉴 리스트 반환
+      myCustomMenus, // 👇 내 커스텀 메뉴 리스트 반환
+      password
     },
     actions: {
       setIsCartOpen, setIsHistoryOpen, setEditingHistoryInfo,

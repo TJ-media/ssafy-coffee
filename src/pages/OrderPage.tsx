@@ -11,7 +11,7 @@ import HistoryModal from '../features/order/ui/HistoryModal';
 import RouletteModal from '../features/roulette/ui/RouletteModal';
 import SettingsModal from '../features/order/ui/SettingsModal';
 import Toast from '../shared/ui/Toast';
-import { updateHistoryApi, updateCartApi, addToCartApi } from '../features/order/api/firebaseApi';
+import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi } from '../features/order/api/firebaseApi';
 import { OrderHistory, RouletteHistory, HistoryItem } from '../shared/types';
 
 const OrderPage = () => {
@@ -251,7 +251,12 @@ const OrderPage = () => {
                 subCategories={subCategories}
                 onSelectCategory={setSelectedCategory}
                 onSelectSubCategory={setSelectedSubCategory}
-                onCopyLink={() => { navigator.clipboard.writeText(window.location.href); actions.addToast('복사 완료'); }}
+                onCopyLink={async () => {
+                    const token = await createInviteTokenApi(state.groupId || '', state.password);
+                    const inviteUrl = `${window.location.origin}/?invite=${token}`;
+                    navigator.clipboard.writeText(inviteUrl);
+                    actions.addToast('초대 링크가 복사되었습니다!', 'success');
+                }}
                 onOpenHistory={() => actions.setIsHistoryOpen(true)}
                 onOpenPinball={actions.handleStartRoulette}
                 onOpenSettings={() => setIsSettingsOpen(true)}
