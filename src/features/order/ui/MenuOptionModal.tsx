@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Menu, OptionType } from '../../../shared/types';
-import { MEGA_MENUS } from '../../../menuData';
 import { X, Snowflake, Flame, Plus, Minus } from 'lucide-react';
 
 interface AddonSelection {
@@ -11,18 +10,14 @@ interface AddonSelection {
 interface Props {
     isOpen: boolean;
     menu: Menu | null;
+    addonMenus: Menu[];
     onClose: () => void;
     onAddToCart: (e: React.MouseEvent, menuName: string, price: number, option: OptionType, category: string) => void;
 }
 
-const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, onClose, onAddToCart }) => {
+const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart }) => {
     const [selectedOption, setSelectedOption] = useState<OptionType>('ICE');
     const [addonSelections, setAddonSelections] = useState<AddonSelection[]>([]);
-
-    // '추가' 카테고리 메뉴 목록 가져오기
-    const addonMenus = useMemo(() => {
-        return MEGA_MENUS.filter(m => m.categoryUpper === '추가');
-    }, []);
 
     // 메뉴가 바뀔 때마다 상태 초기화
     React.useEffect(() => {
