@@ -8,12 +8,12 @@ export const CAFE_LIST = [
 ];
 
 // '즐겨찾기'를 '메뉴 추가'로 변경하여 UI 중복 해결 및 탭 기능 변경
-export const CATEGORIES: string[] = ['메뉴 추가', '커피', '디카페인', '음료', '티', '푸드', '상품', '추가'];
+export const CATEGORIES: string[] = ['메뉴 추가', '커피', '디카페인', '음료', '티', '푸드', '상품'];
 
 export const MEGA_MENUS: Menu[] = [
   // 1. 커피 > 에스프레소
   { id: 1, categoryUpper: '커피', categoryLower: '에스프레소', name: '메가리카노', price: 3000, img: '☕', hasOption: false },
-  { id: 2, categoryUpper: '커피', categoryLower: '에스프레소', name: '아메리카노', price: 1700, img: '☕', hasOption: true },
+  { id: 2, categoryUpper: '커피', categoryLower: '에스프레소', name: '아메리카노', price: 2000, hotPrice: 1700, img: '☕', hasOption: true },
   { id: 3, categoryUpper: '커피', categoryLower: '에스프레소', name: '헛개리카노', price: 2400, img: '☕', hasOption: true },
   { id: 4, categoryUpper: '커피', categoryLower: '에스프레소', name: '왕메가헛개리카노', price: 3400, img: '☕', hasOption: false },
   { id: 5, categoryUpper: '커피', categoryLower: '에스프레소', name: '할메가커피', price: 2100, img: '☕', hasOption: false },
