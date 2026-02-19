@@ -1,4 +1,4 @@
-import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CartItem, Menu, OrderHistory, RouletteHistory } from '../../../shared/types';
 
@@ -67,4 +67,25 @@ export const resetRouletteGameApi = async (groupId: string) => {
 export const updateCustomMenusApi = async (groupId: string, customMenus: { [userName: string]: Menu[] }) => {
     const groupRef = doc(db, 'groups', groupId);
     await updateDoc(groupRef, { customMenus });
+};
+
+// 👇 추가: 초대 토큰 생성 API
+export const createInviteTokenApi = async (groupId: string, password?: string) => {
+    const inviteRef = collection(db, 'invites');
+    const docRef = await addDoc(inviteRef, {
+        groupId,
+        password: password || '',
+        createdAt: serverTimestamp()
+    });
+    return docRef.id;
+};
+
+// 👇 추가: 초대 토큰 조회 API
+export const getInviteTokenApi = async (tokenId: string) => {
+    const docRef = doc(db, 'invites', tokenId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as { groupId: string; password?: string };
+    }
+    return null;
 };
