@@ -9,19 +9,20 @@ interface Props {
     favoriteMenuIds: number[];
     onAddToCart: (e: React.MouseEvent, menu: Menu, option: OptionType) => void;
     onToggleFavorite: (menu: Menu) => void;
+    onMenuSelect: (menu: Menu) => void;
     customMenus: Menu[];
     onSaveCustomMenu: (menu: Menu) => void;
     onDeleteCustomMenu: (id: number) => void;
 }
 
 const MenuGrid: React.FC<Props> = ({
-                                       selectedCategory, selectedSubCategory, favoriteMenuIds,
-                                       onAddToCart, onToggleFavorite,
-                                       customMenus, onSaveCustomMenu, onDeleteCustomMenu
-                                   }) => {
+    selectedCategory, selectedSubCategory, favoriteMenuIds,
+    onAddToCart, onToggleFavorite, onMenuSelect,
+    customMenus, onSaveCustomMenu, onDeleteCustomMenu
+}) => {
     const [customName, setCustomName] = useState('');
     const [customPrice, setCustomPrice] = useState('');
-    const [customOption, setCustomOption] = useState<OptionType>('ICE'); // 👈 추가: 옵션 상태
+    const [customOption, setCustomOption] = useState<OptionType>('ICE');
 
     // 1. 메뉴 직접 담기 & 최근 기록 탭
     if (selectedCategory === '메뉴 추가') {
@@ -45,7 +46,7 @@ const MenuGrid: React.FC<Props> = ({
                     price: parseInt(customPrice),
                     img: '✨',
                     hasOption: false,
-                    defaultOption: customOption // 👈 저장: 선택한 옵션
+                    defaultOption: customOption
                 };
 
                 // 선택한 옵션으로 장바구니 추가
@@ -64,8 +65,8 @@ const MenuGrid: React.FC<Props> = ({
                         <h3 className="text-lg font-bold text-gray-800">메뉴 직접 담기</h3>
                     </div>
                     <p className="text-xs text-gray-500 mb-6 ml-8">
-                        메뉴판에 없는 메뉴를 직접 입력해주세요.<br/>
-                        입력한 메뉴는 '최근 기록' 탭에 저장되어<br/>
+                        메뉴판에 없는 메뉴를 직접 입력해주세요.<br />
+                        입력한 메뉴는 '최근 기록' 탭에 저장되어<br />
                         언제든 다시 불러올 수 있습니다.
                     </p>
 
@@ -91,21 +92,19 @@ const MenuGrid: React.FC<Props> = ({
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setCustomOption('ICE')}
-                                    className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
-                                        customOption === 'ICE'
-                                            ? 'bg-blue-100 text-blue-600 ring-2 ring-blue-500 shadow-sm'
-                                            : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                                    }`}
+                                    className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 ${customOption === 'ICE'
+                                        ? 'bg-blue-100 text-blue-600 ring-2 ring-blue-500 shadow-sm'
+                                        : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                        }`}
                                 >
                                     <Snowflake size={16} /> ICE
                                 </button>
                                 <button
                                     onClick={() => setCustomOption('HOT')}
-                                    className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
-                                        customOption === 'HOT'
-                                            ? 'bg-red-100 text-red-600 ring-2 ring-red-500 shadow-sm'
-                                            : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                                    }`}
+                                    className={`flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 ${customOption === 'HOT'
+                                        ? 'bg-red-100 text-red-600 ring-2 ring-red-500 shadow-sm'
+                                        : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                        }`}
                                 >
                                     <Flame size={16} /> HOT
                                 </button>
@@ -154,7 +153,7 @@ const MenuGrid: React.FC<Props> = ({
                     {customMenus.map(menu => (
                         <div
                             key={menu.id}
-                            onClick={(e) => onAddToCart(e, menu, menu.defaultOption || 'ONLY')} // 👈 저장된 옵션 사용
+                            onClick={(e) => onAddToCart(e, menu, menu.defaultOption || 'ONLY')} // 저장된 옵션 사용
                             className="bg-white p-4 rounded-xl shadow-sm flex items-center justify-between active:scale-98 transition-transform cursor-pointer border border-transparent hover:border-blue-100"
                         >
                             <div className="flex items-center gap-3">
@@ -166,12 +165,11 @@ const MenuGrid: React.FC<Props> = ({
                                         <h4 className="font-bold text-gray-800">{menu.name}</h4>
                                         {/* 옵션 뱃지 표시 */}
                                         {menu.defaultOption && (
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                                menu.defaultOption === 'ICE' ? 'bg-blue-100 text-blue-600' :
-                                                    menu.defaultOption === 'HOT' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'
-                                            }`}>
-                              {menu.defaultOption}
-                            </span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${menu.defaultOption === 'ICE' ? 'bg-blue-100 text-blue-600' :
+                                                menu.defaultOption === 'HOT' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                {menu.defaultOption}
+                                            </span>
                                         )}
                                     </div>
                                     <p className="text-sm text-blue-500 font-bold">{menu.price.toLocaleString()}원</p>
@@ -193,7 +191,7 @@ const MenuGrid: React.FC<Props> = ({
         }
     }
 
-    // 2. 즐겨찾기 탭 로직 (기존 유지)
+    // 2. 즐겨찾기 탭 로직 
     const favoriteMenus = MEGA_MENUS.filter(m => favoriteMenuIds.includes(m.id));
     const currentMenus = selectedCategory === '즐겨찾기'
         ? favoriteMenus
@@ -208,14 +206,18 @@ const MenuGrid: React.FC<Props> = ({
         );
     }
 
-    // 3. 일반 메뉴 그리드 (기존 유지)
+    // 3. 일반 메뉴 그리드 
     return (
         <div className="grid grid-cols-2 gap-4 pb-32">
             {currentMenus
                 .filter(m => selectedCategory === '즐겨찾기' || selectedSubCategory === '전체' || m.categoryLower === selectedSubCategory)
                 .map(menu => (
-                    <div key={menu.id} className="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center transition hover:-translate-y-1 relative group">
-                        <button onClick={() => onToggleFavorite(menu)} className="absolute top-3 right-3 p-1 hover:scale-110 transition z-10">
+                    <div
+                        key={menu.id}
+                        onClick={() => onMenuSelect(menu)}
+                        className="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center transition hover:-translate-y-1 relative group cursor-pointer"
+                    >
+                        <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(menu); }} className="absolute top-3 right-3 p-1 hover:scale-110 transition z-10">
                             <Heart size={20} className={`${favoriteMenuIds.includes(menu.id) ? 'text-red-500 fill-red-500' : 'text-gray-300'} transition-colors`} />
                         </button>
 
@@ -226,17 +228,17 @@ const MenuGrid: React.FC<Props> = ({
                         )}
 
                         <h3 className="font-bold text-gray-800 text-center break-keep mb-1 leading-tight">{menu.name}</h3>
-                        <p className="text-sm text-blue-500 font-bold mb-3">{menu.price.toLocaleString()}원</p>
+                        <p className="text-sm text-blue-500 font-bold mb-3">
+                            {menu.price.toLocaleString()}원
+                            {menu.hotPrice !== undefined && menu.hotPrice !== menu.price && (
+                                <span className="text-[10px] text-gray-400 ml-1">~</span>
+                            )}
+                        </p>
 
                         <div className="flex w-full gap-2 mt-auto">
-                            {menu.hasOption ? (
-                                <>
-                                    <button onClick={(e) => onAddToCart(e, menu, 'ICE')} className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-xl text-xs font-bold hover:bg-blue-100 active:scale-95">ICE</button>
-                                    <button onClick={(e) => onAddToCart(e, menu, 'HOT')} className="flex-1 bg-red-50 text-red-600 py-2 rounded-xl text-xs font-bold hover:bg-red-100 active:scale-95">HOT</button>
-                                </>
-                            ) : (
-                                <button onClick={(e) => onAddToCart(e, menu, 'ONLY')} className="w-full bg-gray-100 text-gray-800 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 active:scale-95">담기</button>
-                            )}
+                            <div className="w-full bg-primary/10 text-primary py-2 rounded-xl text-xs font-bold text-center">
+                                {menu.hasOption ? 'ICE / HOT 선택' : '선택하기'}
+                            </div>
                         </div>
                     </div>
                 ))}

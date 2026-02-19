@@ -6,9 +6,10 @@ export interface Menu {
   categoryLower: string;
   name: string;
   price: number;
+  hotPrice?: number; // HOT 가격이 다를 경우에만 설정 (없으면 price와 동일)
   img: string;
   hasOption: boolean;
-  defaultOption?: OptionType; // 👈 추가: 커스텀 메뉴의 기본 옵션 저장 (ICE/HOT)
+  defaultOption?: OptionType; // 커스텀 메뉴의 기본 옵션 저장 (ICE/HOT)
 }
 
 export interface CartItem {
@@ -47,7 +48,6 @@ export interface FavoriteItem {
   menuId: number;
   menuName: string;
   addedAt: number;
-  // defaultOption?: OptionType; // 즐겨찾기에도 옵션 저장이 필요하다면 추후 고려
 }
 
 export interface HistoryItem {

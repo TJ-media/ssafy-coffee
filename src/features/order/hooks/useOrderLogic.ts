@@ -4,7 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { CartItem, GroupData, OrderHistory, HistoryItem, RouletteGameState, RouletteHistory, ToastMessage, Menu, OptionType } from '../../../shared/types';
 import { getFavorites, addFavorite, removeFavorite, isFavorite } from '../../../shared/utils';
-import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi, updateCartApi, updateCustomMenusApi } from '../api/firebaseApi';
+import { addToCartApi, resetRouletteGameApi, updateHistoryApi, startRouletteGameApi, updateCustomMenusApi } from '../api/firebaseApi';
 
 export const useOrderLogic = () => {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export const useOrderLogic = () => {
   const [marbleCounts, setMarbleCounts] = useState<{ [userName: string]: number }>({});
   const [password, setPassword] = useState<string>('');
 
-  // 👇 추가: 모든 유저의 커스텀 메뉴 맵, 내 커스텀 메뉴 리스트
+
   const [allCustomMenus, setAllCustomMenus] = useState<{ [key: string]: Menu[] }>({});
   const [myCustomMenus, setMyCustomMenus] = useState<Menu[]>([]);
 
@@ -66,7 +66,7 @@ export const useOrderLogic = () => {
         setMarbleCounts(data.marbleCounts || {});
         setPassword(data.password || '');
 
-        // 👇 추가: 커스텀 메뉴 동기화
+
         const loadedCustomMenus = data.customMenus || {};
         setAllCustomMenus(loadedCustomMenus);
         setMyCustomMenus(loadedCustomMenus[userName] || []);
@@ -112,11 +112,10 @@ export const useOrderLogic = () => {
     }
   };
 
-  // 👇 추가: 커스텀 메뉴 저장 핸들러
   const saveCustomMenuHandler = async (menu: Menu) => {
     if (!groupId) return;
 
-    // 내 기존 목록에서 중복 이름 제거 (업데이트 효과) 후 맨 앞에 추가
+    // 내 기존 목록에서 중복 이름 제거 후 맨 앞에 추가
     const newMyList = [menu, ...myCustomMenus.filter(m => m.name !== menu.name)].slice(0, 10); // 최대 10개
 
     const newAllMenus = {
@@ -126,14 +125,13 @@ export const useOrderLogic = () => {
 
     try {
       await updateCustomMenusApi(groupId, newAllMenus);
-      // addToast('메뉴가 기록에 저장되었습니다', 'success'); (너무 자주 뜨면 귀찮으므로 주석 처리 or 필요 시 해제)
+      addToast('메뉴가 기록에 저장되었습니다', 'success'); // 필요없으면 주석 처리 
     } catch (e) {
       console.error("Failed to save custom menu", e);
       addToast('기록 저장 실패', 'warning');
     }
   };
 
-  // 👇 추가: 커스텀 메뉴 삭제 핸들러
   const deleteCustomMenuHandler = async (menuId: number) => {
     if (!groupId) return;
 
@@ -198,28 +196,6 @@ export const useOrderLogic = () => {
       return;
     }
 
-    if (category === '추가') {
-      const reversedCart = [...cart].reverse();
-      const targetItem = reversedCart.find(item => item.userName === userName && item.category !== '추가');
-
-      if (targetItem) {
-        const newMenuName = `${targetItem.menuName} + ${menuName}`;
-        const newPrice = targetItem.price + price;
-        const newCartList = cart.filter(i => i.id !== targetItem.id);
-
-        const mergedItem: CartItem = {
-          ...targetItem,
-          id: Date.now(),
-          menuName: newMenuName,
-          price: newPrice,
-        };
-
-        newCartList.push(mergedItem);
-        await updateCartApi(groupId, newCartList);
-        return;
-      }
-    }
-
     const newItem: CartItem = {
       id: Date.now(),
       userName,
@@ -264,7 +240,7 @@ export const useOrderLogic = () => {
       rouletteGame, marbleCounts, toasts, favoriteMenuIds,
       isCartOpen, isHistoryOpen, editingHistoryInfo,
       isRouletteModalOpen,
-      myCustomMenus, // 👇 내 커스텀 메뉴 리스트 반환
+      myCustomMenus,
       password
     },
     actions: {
@@ -272,8 +248,8 @@ export const useOrderLogic = () => {
       addToast, removeToast, toggleFavoriteHandler, addToCartHandler,
       handleCloseRoulette,
       handleStartRoulette,
-      saveCustomMenuHandler, // 👇 액션 반환
-      deleteCustomMenuHandler // 👇 액션 반환
+      saveCustomMenuHandler,
+      deleteCustomMenuHandler
     }
   };
 };

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useOrderLogic } from '../features/order/hooks/useOrderLogic';
 import { MEGA_MENUS } from '../menuData';
 import MenuGrid from '../features/order/ui/MenuGrid';
+import MenuOptionModal from '../features/order/ui/MenuOptionModal';
 import OrderHeader from '../features/order/ui/OrderHeader';
 import FlyingBall, { FlyingItem } from '../features/order/ui/FlyingBall';
 import CartSheet from '../features/order/ui/CartSheet';
@@ -12,7 +13,7 @@ import RouletteModal from '../features/roulette/ui/RouletteModal';
 import SettingsModal from '../features/order/ui/SettingsModal';
 import Toast from '../shared/ui/Toast';
 import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi } from '../features/order/api/firebaseApi';
-import { OrderHistory, RouletteHistory, HistoryItem } from '../shared/types';
+import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType } from '../shared/types';
 
 const OrderPage = () => {
     const { state, actions } = useOrderLogic();
@@ -24,6 +25,8 @@ const OrderPage = () => {
     const cartFabRef = useRef<HTMLButtonElement>(null);
     const cartSheetRef = useRef<HTMLDivElement>(null);
     const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
+    const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
+    const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
 
     useEffect(() => {
         if (selectedCategory === '메뉴 추가') {
@@ -72,6 +75,18 @@ const OrderPage = () => {
     const handleAddToCartWrapper = async (e: React.MouseEvent, menu: any, option: any) => {
         triggerFlyAnimation(e, '#3a9df2');
         await actions.addToCartHandler(menu.name, menu.price, option, menu.categoryUpper);
+    };
+
+    // 👈 모달에서 담기 시 호출되는 핸들러
+    const handleModalAddToCart = async (e: React.MouseEvent, menuName: string, price: number, option: OptionType, category: string) => {
+        triggerFlyAnimation(e, '#3a9df2');
+        await actions.addToCartHandler(menuName, price, option, category);
+    };
+
+    // 👈 메뉴 카드 클릭 시 모달 열기
+    const handleMenuSelect = (menu: Menu) => {
+        setSelectedMenu(menu);
+        setIsMenuModalOpen(true);
     };
 
     const handleHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
@@ -269,6 +284,13 @@ const OrderPage = () => {
                 </div>
             )}
 
+            <MenuOptionModal
+                isOpen={isMenuModalOpen}
+                menu={selectedMenu}
+                onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); }}
+                onAddToCart={handleModalAddToCart}
+            />
+
             <div className="flex-1 overflow-y-auto p-4 pb-32 custom-scrollbar">
                 <MenuGrid
                     selectedCategory={selectedCategory}
@@ -276,6 +298,7 @@ const OrderPage = () => {
                     favoriteMenuIds={state.favoriteMenuIds}
                     onToggleFavorite={actions.toggleFavoriteHandler}
                     onAddToCart={handleAddToCartWrapper}
+                    onMenuSelect={handleMenuSelect}
                     customMenus={state.myCustomMenus}
                     onSaveCustomMenu={actions.saveCustomMenuHandler}
                     onDeleteCustomMenu={actions.deleteCustomMenuHandler}
