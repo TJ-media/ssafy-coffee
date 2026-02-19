@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { ShoppingCart, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderLogic } from '../features/order/hooks/useOrderLogic';
-import { MEGA_MENUS } from '../menuData';
+import { useMenuData } from '../features/menu/hooks/useMenuData';
 import MenuGrid from '../features/order/ui/MenuGrid';
 import MenuOptionModal from '../features/order/ui/MenuOptionModal';
 import OrderHeader from '../features/order/ui/OrderHeader';
@@ -17,6 +17,7 @@ import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType } from '..
 
 const OrderPage = () => {
     const { state, actions } = useOrderLogic();
+    const { menus: allMenus, categories } = useMenuData();
     const navigate = useNavigate();
 
     const [selectedCategory, setSelectedCategory] = useState('커피');
@@ -41,10 +42,15 @@ const OrderPage = () => {
             return ['직접 입력', '최근 기록'];
         }
 
-        const menus = MEGA_MENUS.filter(m => m.categoryUpper === selectedCategory);
-        const uniqueLowers = Array.from(new Set(menus.map(m => m.categoryLower)));
+        const filtered = allMenus.filter(m => m.categoryUpper === selectedCategory);
+        const uniqueLowers = Array.from(new Set(filtered.map(m => m.categoryLower)));
         return ['전체', ...uniqueLowers];
-    }, [selectedCategory]);
+    }, [selectedCategory, allMenus]);
+
+    // Firestore 메뉴에서 '추가' 카테고리 아이템만 필터 (MenuOptionModal용)
+    const addonMenus = useMemo(() => {
+        return allMenus.filter(m => m.categoryUpper === '추가');
+    }, [allMenus]);
 
     const handleLogout = () => {
         if (confirm('나가시겠습니까?')) {
@@ -264,6 +270,7 @@ const OrderPage = () => {
                 selectedCategory={selectedCategory}
                 selectedSubCategory={selectedSubCategory}
                 subCategories={subCategories}
+                categories={categories}
                 onSelectCategory={setSelectedCategory}
                 onSelectSubCategory={setSelectedSubCategory}
                 onCopyLink={async () => {
@@ -287,6 +294,7 @@ const OrderPage = () => {
             <MenuOptionModal
                 isOpen={isMenuModalOpen}
                 menu={selectedMenu}
+                addonMenus={addonMenus}
                 onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); }}
                 onAddToCart={handleModalAddToCart}
             />
@@ -299,6 +307,7 @@ const OrderPage = () => {
                     onToggleFavorite={actions.toggleFavoriteHandler}
                     onAddToCart={handleAddToCartWrapper}
                     onMenuSelect={handleMenuSelect}
+                    menus={allMenus}
                     customMenus={state.myCustomMenus}
                     onSaveCustomMenu={actions.saveCustomMenuHandler}
                     onDeleteCustomMenu={actions.deleteCustomMenuHandler}
