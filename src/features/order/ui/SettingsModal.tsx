@@ -3,7 +3,7 @@ import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import {
     X, Users, History, Settings, Key, Lock, Minus, Plus, RotateCcw,
-    Pencil, Trash2, PlusCircle, UserCheck, UserX
+    Pencil, Trash2, PlusCircle, UserCheck, UserX, ChevronDown
 } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 import { RouletteHistory, GroupData } from '../../../shared/types';
@@ -37,6 +37,15 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
     const [newHistoryDate, setNewHistoryDate] = useState('');
     const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
 
+    // Marble Sort State
+    type MarbleSortMode = 'name-asc' | 'name-desc' | 'count-asc' | 'count-desc';
+    const [marbleSortMode, setMarbleSortMode] = useState<MarbleSortMode>('name-asc');
+    const [marbleSortOpen, setMarbleSortOpen] = useState(false);
+
+    // Marble Input State (빈칸 허용을 위한 로컬 상태)
+    const [marbleInputValues, setMarbleInputValues] = useState<{ [userName: string]: string }>({});
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+
     // 초기화
     useEffect(() => {
         if (!isOpen) {
@@ -54,7 +63,18 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
         const unsub = onSnapshot(doc(db, 'groups', groupId), (docSnapshot) => {
             if (docSnapshot.exists()) {
                 const data = docSnapshot.data();
-                setMarbleCounts(data.marbleCounts || {});
+                const mc = data.marbleCounts || {};
+                setMarbleCounts(mc);
+                // Firestore에서 받은 값으로 inputValues 동기화 (현재 포커스 중이 아닌 것만)
+                setMarbleInputValues(prev => {
+                    const next: { [k: string]: string } = {};
+                    Object.keys(mc).forEach(u => {
+                        next[u] = prev[u] !== undefined && document.activeElement?.getAttribute('data-marble-user') === u
+                            ? prev[u]
+                            : String(mc[u] ?? 0);
+                    });
+                    return next;
+                });
                 setPendingUsers(data.pendingUsers || []);
                 setApprovedUsers(data.approvedUsers || []);
                 setRouletteHistory(data.rouletteHistory || []);
@@ -115,12 +135,17 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
 
     const updateMarbleCount = async (userName: string, newCount: number) => {
         if (!groupId) return;
-        if (newCount < 1) newCount = 1;
+        if (newCount < 0) newCount = 0;
         if (newCount > 50) newCount = 50;
 
         try {
             await updateDoc(doc(db, 'groups', groupId), { [`marbleCounts.${userName}`]: newCount });
         } catch (e) { console.error(e); }
+    };
+
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 2000);
     };
 
     const resetAllCounts = async () => {
@@ -221,12 +246,28 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
     if (!isOpen) return null;
 
     const marbleUsers = Object.keys(marbleCounts);
+    const sortedMarbleUsers = [...marbleUsers].sort((a, b) => {
+        switch (marbleSortMode) {
+            case 'name-asc': return a.localeCompare(b, 'ko');
+            case 'name-desc': return b.localeCompare(a, 'ko');
+            case 'count-asc': return (marbleCounts[a] ?? 0) - (marbleCounts[b] ?? 0);
+            case 'count-desc': return (marbleCounts[b] ?? 0) - (marbleCounts[a] ?? 0);
+            default: return 0;
+        }
+    });
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl max-h-[85vh] flex flex-col relative z-10 animate-slide-up overflow-hidden">
+
+                {/* Toast */}
+                {toastMessage && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-lg animate-slide-up">
+                        {toastMessage}
+                    </div>
+                )}
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white shrink-0">
@@ -271,9 +312,8 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id as any)}
-                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
-                                            activeTab === tab.id ? 'bg-white shadow-sm text-primary' : 'text-text-secondary'
-                                        }`}
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${activeTab === tab.id ? 'bg-white shadow-sm text-primary' : 'text-text-secondary'
+                                            }`}
                                     >
                                         <tab.icon size={14} />
                                         {tab.label}
@@ -297,7 +337,7 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
                                                     <div key={u} className="flex justify-between items-center bg-amber-50 p-3 rounded-xl mb-2 shadow-sm border border-amber-200">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm"
-                                                                 style={{ backgroundColor: getAvatarColor(u), color: getTextContrastColor() }}>
+                                                                style={{ backgroundColor: getAvatarColor(u), color: getTextContrastColor() }}>
                                                                 {u.slice(0, 2)}
                                                             </div>
                                                             <span className="font-bold text-sm text-text-primary">{u}</span>
@@ -318,7 +358,7 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
                                                 <div key={u} className="flex justify-between items-center bg-white p-3 rounded-xl mb-2 shadow-sm border border-gray-100">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm"
-                                                             style={{ backgroundColor: getAvatarColor(u), color: getTextContrastColor() }}>
+                                                            style={{ backgroundColor: getAvatarColor(u), color: getTextContrastColor() }}>
                                                             {u.slice(0, 2)}
                                                         </div>
                                                         <span className="font-bold text-sm text-text-primary">{u}</span>
@@ -332,24 +372,90 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
 
                                 {activeTab === 'marble' && (
                                     <div className="space-y-3">
-                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-2">
                                             <p className="text-xs text-amber-800">🎱 공 개수가 많을수록 룰렛 당첨(커피 사기) 확률이 높아져요 (최대 50개)</p>
                                         </div>
-                                        {marbleUsers.length === 0 ? <div className="text-center py-8 text-gray-400">사용자가 없습니다</div> :
-                                            marbleUsers.map(u => {
-                                                const count = marbleCounts[u] || 1;
+                                        {/* 정렬 Dropdown */}
+                                        <div className="flex items-center justify-end mb-2">
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setMarbleSortOpen(prev => !prev)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition border bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200 hover:text-gray-800"
+                                                >
+                                                    정렬: {marbleSortMode === 'name-asc' ? '이름 ⬆️' : marbleSortMode === 'name-desc' ? '이름 ⬇️' : marbleSortMode === 'count-asc' ? '공 개수 ⬆️' : '공 개수 ⬇️'}
+                                                    <ChevronDown size={14} className={`transition-transform ${marbleSortOpen ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                {marbleSortOpen && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-40" onClick={() => setMarbleSortOpen(false)} />
+                                                        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden w-full">
+                                                            {[
+                                                                { mode: 'name-asc' as MarbleSortMode, label: '이름 오름차순' },
+                                                                { mode: 'name-desc' as MarbleSortMode, label: '이름 내림차순' },
+                                                                { mode: 'count-asc' as MarbleSortMode, label: '공 개수 오름차순' },
+                                                                { mode: 'count-desc' as MarbleSortMode, label: '공 개수 내림차순' },
+                                                            ].map(opt => (
+                                                                <button
+                                                                    key={opt.mode}
+                                                                    onClick={() => { setMarbleSortMode(opt.mode); setMarbleSortOpen(false); }}
+                                                                    className={`w-full text-left px-3 py-2.5 text-xs font-medium transition whitespace-nowrap ${marbleSortMode === opt.mode
+                                                                        ? 'bg-primary/10 text-primary font-bold'
+                                                                        : 'text-text-primary hover:bg-gray-50'
+                                                                        }`}
+                                                                >
+                                                                    {opt.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {sortedMarbleUsers.length === 0 ? <div className="text-center py-8 text-gray-400">사용자가 없습니다</div> :
+                                            sortedMarbleUsers.map(u => {
+                                                const count = marbleCounts[u] ?? 0;
+                                                const inputVal = marbleInputValues[u] ?? String(count);
                                                 return (
                                                     <div key={u} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm"
-                                                                 style={{ backgroundColor: getAvatarColor(u), color: getTextContrastColor() }}>
-                                                                {u.slice(0, 2)}
+                                                            <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shadow-inner shrink-0"
+                                                                style={{ backgroundColor: getAvatarColor(u), color: getTextContrastColor() }}>
+                                                                {u.slice(0, 3)}
                                                             </div>
                                                             <span className="font-bold text-sm text-text-primary">{u}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <button onClick={() => updateMarbleCount(u, count - 1)} disabled={count <= 1} className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-30 transition"><Minus size={18} /></button>
-                                                            <div className="w-20 text-center"><span className="text-xl font-bold text-primary">🎱 {count}</span></div>
+                                                            <button onClick={() => updateMarbleCount(u, count - 1)} disabled={count <= 0} className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-30 transition"><Minus size={18} /></button>
+                                                            <div className="w-20 text-center">
+                                                                <span className="text-lg font-bold text-primary">🎱</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    max={50}
+                                                                    data-marble-user={u}
+                                                                    value={inputVal}
+                                                                    onChange={(e) => {
+                                                                        const raw = e.target.value;
+                                                                        setMarbleInputValues(prev => ({ ...prev, [u]: raw }));
+                                                                        const val = parseInt(raw);
+                                                                        if (!isNaN(val)) updateMarbleCount(u, val);
+                                                                    }}
+                                                                    onBlur={(e) => {
+                                                                        const raw = e.target.value.trim();
+                                                                        if (raw === '') {
+                                                                            showToast('공 개수를 입력하세요!');
+                                                                            updateMarbleCount(u, 0);
+                                                                            setMarbleInputValues(prev => ({ ...prev, [u]: '0' }));
+                                                                        } else {
+                                                                            const val = parseInt(raw);
+                                                                            const clamped = isNaN(val) ? 0 : Math.max(0, Math.min(50, val));
+                                                                            updateMarbleCount(u, clamped);
+                                                                            setMarbleInputValues(prev => ({ ...prev, [u]: String(clamped) }));
+                                                                        }
+                                                                    }}
+                                                                    className="w-10 text-center text-xl font-bold text-primary bg-transparent border-b-2 border-primary/30 focus:border-primary focus:outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                                />
+                                                            </div>
                                                             <button onClick={() => updateMarbleCount(u, count + 1)} disabled={count >= 50} className="w-9 h-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-30 transition"><Plus size={18} /></button>
                                                         </div>
                                                     </div>
@@ -364,7 +470,7 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
                                     <div className="space-y-4">
                                         <div className={`bg-white p-4 rounded-xl shadow-sm border ${editingHistoryId ? 'border-amber-400 ring-1 ring-amber-400' : 'border-gray-200'}`}>
                                             <h3 className="font-bold text-sm mb-3 flex items-center gap-2 text-text-primary">
-                                                {editingHistoryId ? <><Pencil size={16} className="text-amber-500"/>기록 수정</> : <><PlusCircle size={16} className="text-primary"/>기록 추가</>}
+                                                {editingHistoryId ? <><Pencil size={16} className="text-amber-500" />기록 수정</> : <><PlusCircle size={16} className="text-primary" />기록 추가</>}
                                                 {editingHistoryId && <button onClick={resetHistoryForm} className="ml-auto text-xs text-gray-400 underline">취소</button>}
                                             </h3>
                                             <div className="space-y-3">
@@ -378,10 +484,10 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <h3 className="font-bold text-text-primary text-sm flex items-center gap-2 mb-2"><History size={16}/> 최근 기록 ({rouletteHistory.length})</h3>
-                                            {rouletteHistory.sort((a,b) => (b.playedAt?.toDate ? b.playedAt.toDate() : new Date(b.playedAt)).getTime() - (a.playedAt?.toDate ? a.playedAt.toDate() : new Date(a.playedAt)).getTime()).map(h => {
+                                            <h3 className="font-bold text-text-primary text-sm flex items-center gap-2 mb-2"><History size={16} /> 최근 기록 ({rouletteHistory.length})</h3>
+                                            {rouletteHistory.sort((a, b) => (b.playedAt?.toDate ? b.playedAt.toDate() : new Date(b.playedAt)).getTime() - (a.playedAt?.toDate ? a.playedAt.toDate() : new Date(a.playedAt)).getTime()).map(h => {
                                                 const date = h.playedAt?.toDate ? h.playedAt.toDate() : new Date(h.playedAt);
-                                                const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
+                                                const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
                                                 return (
                                                     <div key={h.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                                                         <div className="flex items-center gap-3">
