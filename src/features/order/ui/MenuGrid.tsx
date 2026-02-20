@@ -236,8 +236,15 @@ const MenuGrid: React.FC<Props> = ({
                         </p>
 
                         <div className="flex w-full gap-2 mt-auto">
-                            <div className="w-full bg-primary/10 text-primary py-2 rounded-xl text-xs font-bold text-center">
-                                {menu.hasOption ? 'ICE / HOT 선택' : '선택하기'}
+                            <div className={`w-full py-2 rounded-xl text-xs font-bold text-center ${menu.hasOption
+                                    ? 'bg-green-50 text-green-600'
+                                    : menu.defaultOption === 'HOT'
+                                        ? 'bg-red-50 text-red-500'
+                                        : 'bg-primary/10 text-primary'
+                                }`}>
+                                {menu.hasOption ? 'ICE / HOT 선택' :
+                                    menu.defaultOption === 'HOT' ? '🔥 ONLY HOT' :
+                                        menu.defaultOption === 'ICE' ? '🧊 ONLY ICE' : '선택하기'}
                             </div>
                         </div>
                     </div>
