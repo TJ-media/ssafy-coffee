@@ -3,6 +3,7 @@ import { ShoppingCart, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderLogic } from '../features/order/hooks/useOrderLogic';
 import { useMenuData } from '../features/menu/hooks/useMenuData';
+import { useMenuSearch } from '../features/order/hooks/useMenuSearch';
 import MenuGrid from '../features/order/ui/MenuGrid';
 import MenuOptionModal from '../features/order/ui/MenuOptionModal';
 import OrderHeader from '../features/order/ui/OrderHeader';
@@ -11,6 +12,7 @@ import CartSheet from '../features/order/ui/CartSheet';
 import HistoryModal from '../features/order/ui/HistoryModal';
 import RouletteModal from '../features/roulette/ui/RouletteModal';
 import SettingsModal from '../features/order/ui/SettingsModal';
+import SearchBar from '../features/order/ui/SearchBar';
 import Toast from '../shared/ui/Toast';
 import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi } from '../features/order/api/firebaseApi';
 import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType } from '../shared/types';
@@ -19,6 +21,7 @@ const OrderPage = () => {
     const { state, actions } = useOrderLogic();
     const { menus: allMenus, categories } = useMenuData();
     const navigate = useNavigate();
+    const { searchQuery, setSearchQuery, isSearchMode, setIsSearchMode, searchResults, convertedQuery, clearSearch } = useMenuSearch(allMenus);
 
     const [selectedCategory, setSelectedCategory] = useState('커피');
     const [selectedSubCategory, setSelectedSubCategory] = useState('전체');
@@ -283,6 +286,14 @@ const OrderPage = () => {
                 onOpenPinball={actions.handleStartRoulette}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onLogout={handleLogout}
+                onToggleSearch={() => {
+                    if (isSearchMode) {
+                        clearSearch();
+                    } else {
+                        setIsSearchMode(true);
+                    }
+                }}
+                isSearchMode={isSearchMode}
             />
 
             {state.editingHistoryInfo && (
@@ -299,20 +310,35 @@ const OrderPage = () => {
                 onAddToCart={handleModalAddToCart}
             />
 
-            <div className="flex-1 overflow-y-auto p-4 pb-32 custom-scrollbar">
-                <MenuGrid
-                    selectedCategory={selectedCategory}
-                    selectedSubCategory={selectedSubCategory}
-                    favoriteMenuIds={state.favoriteMenuIds}
-                    onToggleFavorite={actions.toggleFavoriteHandler}
-                    onAddToCart={handleAddToCartWrapper}
-                    onMenuSelect={handleMenuSelect}
-                    menus={allMenus}
-                    customMenus={state.myCustomMenus}
-                    onSaveCustomMenu={actions.saveCustomMenuHandler}
-                    onDeleteCustomMenu={actions.deleteCustomMenuHandler}
+            {isSearchMode && (
+                <SearchBar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    convertedQuery={convertedQuery}
+                    searchResults={searchResults}
+                    onMenuSelect={(menu) => {
+                        handleMenuSelect(menu);
+                    }}
+                    onClose={clearSearch}
                 />
-            </div>
+            )}
+
+            {!isSearchMode && (
+                <div className="flex-1 overflow-y-auto p-4 pb-32 custom-scrollbar">
+                    <MenuGrid
+                        selectedCategory={selectedCategory}
+                        selectedSubCategory={selectedSubCategory}
+                        favoriteMenuIds={state.favoriteMenuIds}
+                        onToggleFavorite={actions.toggleFavoriteHandler}
+                        onAddToCart={handleAddToCartWrapper}
+                        onMenuSelect={handleMenuSelect}
+                        menus={allMenus}
+                        customMenus={state.myCustomMenus}
+                        onSaveCustomMenu={actions.saveCustomMenuHandler}
+                        onDeleteCustomMenu={actions.deleteCustomMenuHandler}
+                    />
+                </div>
+            )}
 
             {!state.isCartOpen && (
                 <button
