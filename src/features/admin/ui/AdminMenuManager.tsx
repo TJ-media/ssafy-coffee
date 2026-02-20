@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useMenuData } from '../../menu/hooks/useMenuData';
 import { addMenuItem, updateMenuItem, deleteMenuItem, updateCategories } from '../api/menuAdminApi';
-import { Menu } from '../../../shared/types';
+import { Menu, OptionType } from '../../../shared/types';
 
 interface ToastFn {
     (message: string, type?: 'info' | 'success' | 'warning'): void;
@@ -33,6 +33,7 @@ interface MenuFormData {
     categoryLower: string;
     img: string;
     hasOption: boolean;
+    defaultOption: OptionType | '';
 }
 
 const EMPTY_FORM: MenuFormData = {
@@ -43,6 +44,7 @@ const EMPTY_FORM: MenuFormData = {
     categoryLower: '',
     img: '☕',
     hasOption: false,
+    defaultOption: 'ICE',
 };
 
 const EMOJI_OPTIONS = ['☕', '🥤', '🧋', '🍵', '🥛', '🧃', '🍹', '🍨', '🍞', '🎁', '💊', '🍰', '🥐', '🫖', '🍫', '🥜'];
@@ -106,6 +108,7 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
         setFormData({
             ...EMPTY_FORM,
             categoryUpper: categories.filter(c => c !== '메뉴 추가')[0] || '',
+            defaultOption: 'ICE',
         });
         setIsModalOpen(true);
     };
@@ -121,6 +124,7 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
             categoryLower: menu.categoryLower,
             img: menu.img,
             hasOption: menu.hasOption,
+            defaultOption: menu.defaultOption || 'ICE',
         });
         setIsModalOpen(true);
     };
@@ -167,6 +171,7 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                 categoryLower: formData.categoryLower.trim(),
                 img: formData.img,
                 hasOption: formData.hasOption,
+                ...(!formData.hasOption && formData.defaultOption ? { defaultOption: formData.defaultOption as OptionType } : {}),
             };
 
             if (editingMenu) {
@@ -448,8 +453,12 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                                 <div className="hidden sm:block">
                                     {menu.hasOption ? (
                                         <span className="text-xs font-medium px-2 py-1 bg-green-50 text-green-600 rounded-md">ICE/HOT</span>
+                                    ) : menu.defaultOption === 'HOT' ? (
+                                        <span className="text-xs font-medium px-2 py-1 bg-red-50 text-red-500 rounded-md">🔥 HOT only</span>
+                                    ) : menu.defaultOption === 'ONLY' ? (
+                                        <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-500 rounded-md">단일</span>
                                     ) : (
-                                        <span className="text-xs text-text-secondary">—</span>
+                                        <span className="text-xs font-medium px-2 py-1 bg-blue-50 text-blue-500 rounded-md">🧊 ICE only</span>
                                     )}
                                 </div>
 
@@ -637,6 +646,42 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* 기본 옵션 (hasOption이 false일 때만) */}
+                            {!formData.hasOption && (
+                                <div>
+                                    <label className="block text-xs font-bold text-text-secondary mb-2 uppercase tracking-wider">기본 옵션 (고정)</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setFormData(prev => ({ ...prev, defaultOption: 'ICE' }))}
+                                            className={`flex-1 py-3 rounded-xl font-bold text-sm transition border-2 ${formData.defaultOption === 'ICE'
+                                                ? 'bg-blue-50 text-blue-600 border-blue-400'
+                                                : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            🧊 ICE only
+                                        </button>
+                                        <button
+                                            onClick={() => setFormData(prev => ({ ...prev, defaultOption: 'HOT' }))}
+                                            className={`flex-1 py-3 rounded-xl font-bold text-sm transition border-2 ${formData.defaultOption === 'HOT'
+                                                ? 'bg-red-50 text-red-500 border-red-400'
+                                                : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            🔥 HOT only
+                                        </button>
+                                        <button
+                                            onClick={() => setFormData(prev => ({ ...prev, defaultOption: 'ONLY' }))}
+                                            className={`flex-1 py-3 rounded-xl font-bold text-sm transition border-2 ${formData.defaultOption === 'ONLY'
+                                                ? 'bg-gray-200 text-gray-600 border-gray-400'
+                                                : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            단일
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* 모달 푸터 */}
