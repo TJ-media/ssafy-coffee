@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Link, History, Target, LogOut, Heart, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { Link, History, Target, LogOut, Heart, ChevronLeft, ChevronRight, Settings, Search } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 
 interface Props {
@@ -16,12 +16,15 @@ interface Props {
     onOpenSettings: () => void;
     onCopyLink: () => void;
     onLogout: () => void;
+    onToggleSearch: () => void;
+    isSearchMode: boolean;
 }
 
 const OrderHeader: React.FC<Props> = ({
     groupId, userName, selectedCategory, selectedSubCategory,
     onSelectCategory, onSelectSubCategory, subCategories, categories,
-    onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout
+    onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout,
+    onToggleSearch, isSearchMode
 }) => {
     const categoryScrollRef = useRef<HTMLDivElement>(null);
     const subCategoryScrollRef = useRef<HTMLDivElement>(null);
@@ -73,6 +76,11 @@ const OrderHeader: React.FC<Props> = ({
                     </div>
                 </div>
                 <div className="flex items-start gap-0.5">
+                    <button onClick={onToggleSearch} className={`relative group flex flex-col items-center px-1.5 py-1 transition-colors rounded-lg ${isSearchMode ? 'text-primary bg-blue-50' : 'hover:text-primary hover:bg-gray-50'}`}>
+                        <Search size={18} />
+                        <span className={`text-[9px] mt-0.5 ${isSearchMode ? 'text-primary' : 'text-text-secondary group-hover:text-primary'}`}>검색</span>
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">메뉴 검색</span>
+                    </button>
                     <button onClick={onCopyLink} className="relative group flex flex-col items-center px-1.5 py-1 hover:text-primary transition-colors rounded-lg hover:bg-gray-50">
                         <Link size={18} />
                         <span className="text-[9px] mt-0.5 text-text-secondary group-hover:text-primary">초대</span>
