@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     Plus,
     Pencil,
@@ -12,10 +12,14 @@ import {
     Tag,
     ChevronDown,
     ChevronUp,
+    MessageSquarePlus,
+    Check,
+    Clock,
 } from 'lucide-react';
 import { useMenuData } from '../../menu/hooks/useMenuData';
 import { addMenuItem, updateMenuItem, deleteMenuItem, updateCategories } from '../api/menuAdminApi';
-import { Menu, OptionType } from '../../../shared/types';
+import { subscribeMenuRequests, approveMenuRequest, deleteMenuRequest } from '../../order/api/menuRequestApi';
+import { Menu, OptionType, MenuRequest } from '../../../shared/types';
 
 interface ToastFn {
     (message: string, type?: 'info' | 'success' | 'warning'): void;
@@ -64,6 +68,24 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
     // ─── 카테고리 관리 상태 ───
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [newCategory, setNewCategory] = useState('');
+
+    // ─── 메뉴 신청 상태 ───
+    const [showRequests, setShowRequests] = useState(false);
+    const [menuRequests, setMenuRequests] = useState<MenuRequest[]>([]);
+    const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+    const [deleteTargetMenu, setDeleteTargetMenu] = useState<Menu | null>(null);
+
+    // ─── 메뉴 신청 실시간 구독 ───
+    useEffect(() => {
+        const unsubscribe = subscribeMenuRequests((requests) => {
+            setMenuRequests(requests);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const pendingRequests = useMemo(() =>
+        menuRequests.filter(r => r.status === 'pending'),
+        [menuRequests]);
 
     // ─── 필터링된 메뉴 ───
     const filteredMenus = useMemo(() => {
@@ -191,9 +213,14 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
     };
 
     // ─── 삭제 ───
-    const handleDelete = async (menu: Menu) => {
-        if (!confirm(`"${menu.name}" 메뉴를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    const handleDelete = (menu: Menu) => {
+        setDeleteTargetMenu(menu);
+    };
 
+    const confirmDelete = async () => {
+        if (!deleteTargetMenu) return;
+        const menu = deleteTargetMenu;
+        setDeleteTargetMenu(null);
         setDeletingId(menu.id);
         try {
             await deleteMenuItem(menus, menu.id);
@@ -282,7 +309,22 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                 </div>
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={() => setShowCategoryManager(!showCategoryManager)}
+                        onClick={() => { setShowRequests(!showRequests); setShowCategoryManager(false); }}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition relative ${showRequests
+                            ? 'bg-purple-100 text-purple-600'
+                            : 'bg-white border border-gray-200 text-text-secondary hover:bg-gray-50'
+                            }`}
+                    >
+                        <MessageSquarePlus size={16} />
+                        신청
+                        {pendingRequests.length > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                                {pendingRequests.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => { setShowCategoryManager(!showCategoryManager); setShowRequests(false); }}
                         className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition ${showCategoryManager
                             ? 'bg-orange-100 text-orange-600'
                             : 'bg-white border border-gray-200 text-text-secondary hover:bg-gray-50'
@@ -347,6 +389,122 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                             추가
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* ─── 메뉴 신청 목록 ─── */}
+            {showRequests && (
+                <div className="bg-white rounded-2xl shadow-toss p-5 mb-6 animate-fade-in-up">
+                    <h3 className="text-sm font-bold text-text-primary mb-3 flex items-center gap-2">
+                        <MessageSquarePlus size={16} className="text-purple-500" />
+                        메뉴 신청 목록
+                        {pendingRequests.length > 0 && (
+                            <span className="bg-purple-100 text-purple-600 text-xs px-2 py-0.5 rounded-full font-bold">
+                                {pendingRequests.length}건 대기중
+                            </span>
+                        )}
+                    </h3>
+
+                    {pendingRequests.length === 0 ? (
+                        <div className="text-center py-8 text-text-secondary">
+                            <Clock size={32} className="mx-auto mb-2 opacity-30" />
+                            <p className="text-sm">대기중인 신청이 없습니다.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {pendingRequests.map(request => (
+                                <div
+                                    key={request.id}
+                                    className="border border-purple-100 rounded-xl p-4 bg-purple-50/30"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <p className="font-bold text-text-primary text-sm">
+                                                    ☕ {request.menuName}
+                                                </p>
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${request.optionType === 'both' ? 'bg-green-50 text-green-600' :
+                                                    request.optionType === 'ice' ? 'bg-blue-50 text-blue-600' :
+                                                        request.optionType === 'hot' ? 'bg-red-50 text-red-500' :
+                                                            'bg-gray-100 text-gray-500'
+                                                    }`}>
+                                                    {request.optionType === 'both' ? 'ICE/HOT' :
+                                                        request.optionType === 'ice' ? 'ICE ONLY' :
+                                                            request.optionType === 'hot' ? 'HOT ONLY' : '모름'}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm font-bold text-blue-500 mb-1.5">
+                                                {request.price.toLocaleString()}원
+                                            </p>
+                                            <div className="flex items-center gap-2 text-xs text-text-secondary">
+                                                <span className="bg-gray-100 px-2 py-0.5 rounded font-medium">
+                                                    {request.requesterName}
+                                                </span>
+                                                <span>
+                                                    {request.createdAt?.toDate?.()
+                                                        ? new Date(request.createdAt.toDate()).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                        : ''}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                onClick={() => {
+                                                    // 수락: 모달을 열고 신청 정보로 pre-fill
+                                                    setEditingMenu(null);
+                                                    setFormData({
+                                                        ...EMPTY_FORM,
+                                                        name: request.menuName,
+                                                        price: String(request.price),
+                                                        categoryUpper: categories.filter(c => c !== '메뉴 추가')[0] || '',
+                                                        hasOption: request.optionType === 'both',
+                                                        defaultOption: request.optionType === 'ice' ? 'ICE' :
+                                                            request.optionType === 'hot' ? 'HOT' :
+                                                                request.optionType === 'both' ? '' : 'ICE',
+                                                    });
+                                                    setIsModalOpen(true);
+                                                    // 신청 수락 처리
+                                                    approveMenuRequest(request.id).catch(console.error);
+                                                    addToast(`"${request.menuName}" 신청을 수락했습니다. 메뉴 정보를 확인해주세요.`, 'success');
+                                                }}
+                                                disabled={processingRequestId === request.id}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 transition"
+                                                title="수락 후 메뉴 추가"
+                                            >
+                                                <Check size={14} />
+                                                수락
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    if (!confirm(`"${request.menuName}" 신청을 삭제하시겠습니까?`)) return;
+                                                    setProcessingRequestId(request.id);
+                                                    try {
+                                                        await deleteMenuRequest(request.id);
+                                                        addToast(`"${request.menuName}" 신청을 삭제했습니다.`, 'info');
+                                                    } catch (err) {
+                                                        console.error('신청 삭제 실패:', err);
+                                                        addToast('신청 삭제에 실패했습니다.', 'warning');
+                                                    } finally {
+                                                        setProcessingRequestId(null);
+                                                    }
+                                                }}
+                                                disabled={processingRequestId === request.id}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 text-text-secondary rounded-lg text-xs font-bold hover:bg-red-50 hover:text-danger hover:border-red-200 transition"
+                                                title="신청 삭제"
+                                            >
+                                                {processingRequestId === request.id ? (
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                ) : (
+                                                    <Trash2 size={14} />
+                                                )}
+                                                삭제
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -706,6 +864,41 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                                     </>
                                 )}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── 삭제 확인 오버레이 ─── */}
+            {deleteTargetMenu && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-fade-in-up">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                                <Trash2 size={28} className="text-danger" />
+                            </div>
+                            <h3 className="text-lg font-bold text-text-primary mb-2">메뉴 삭제</h3>
+                            <p className="text-sm text-text-secondary mb-1">
+                                <span className="font-bold text-text-primary">"{deleteTargetMenu.name}"</span> 메뉴를
+                            </p>
+                            <p className="text-sm text-text-secondary mb-6">
+                                삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                            </p>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => setDeleteTargetMenu(null)}
+                                    className="flex-1 py-3 rounded-xl bg-gray-100 text-text-secondary font-bold text-sm hover:bg-gray-200 transition"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition flex items-center justify-center gap-1.5"
+                                >
+                                    <Trash2 size={16} />
+                                    삭제
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

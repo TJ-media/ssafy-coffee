@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Menu, OptionType } from '../../../shared/types';
-import { Heart, Plus, Coffee, History, Trash2, Snowflake, Flame } from 'lucide-react';
+import { Heart, Plus, Coffee, History, Trash2, Snowflake, Flame, Send, MessageSquarePlus, Loader2, CheckCircle } from 'lucide-react';
+import { submitMenuRequest } from '../api/menuRequestApi';
 
 interface Props {
     selectedCategory: string;
@@ -13,16 +14,26 @@ interface Props {
     customMenus: Menu[];
     onSaveCustomMenu: (menu: Menu) => void;
     onDeleteCustomMenu: (id: number) => void;
+    groupId: string;
+    userName: string;
 }
 
 const MenuGrid: React.FC<Props> = ({
     selectedCategory, selectedSubCategory, favoriteMenuIds,
     onAddToCart, onToggleFavorite, onMenuSelect,
-    menus, customMenus, onSaveCustomMenu, onDeleteCustomMenu
+    menus, customMenus, onSaveCustomMenu, onDeleteCustomMenu,
+    groupId, userName
 }) => {
     const [customName, setCustomName] = useState('');
     const [customPrice, setCustomPrice] = useState('');
     const [customOption, setCustomOption] = useState<OptionType>('ICE');
+
+    // 메뉴 신청 상태
+    const [requestMenuName, setRequestMenuName] = useState('');
+    const [requestPrice, setRequestPrice] = useState('');
+    const [requestOptionType, setRequestOptionType] = useState<'both' | 'ice' | 'hot' | 'unknown'>('both');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
 
     // 1. 메뉴 직접 담기 & 최근 기록 탭
     if (selectedCategory === '메뉴 추가') {
@@ -189,6 +200,146 @@ const MenuGrid: React.FC<Props> = ({
                 </div>
             );
         }
+
+        // 1-3. 메뉴 신청 탭
+        if (selectedSubCategory === '메뉴 신청') {
+            const handleSubmitRequest = async () => {
+                if (!requestMenuName.trim()) {
+                    alert('메뉴 이름을 입력해주세요');
+                    return;
+                }
+                if (!requestPrice || parseInt(requestPrice) <= 0) {
+                    alert('가격을 올바르게 입력해주세요');
+                    return;
+                }
+
+                setIsSubmitting(true);
+                try {
+                    await submitMenuRequest(
+                        requestMenuName.trim(),
+                        parseInt(requestPrice),
+                        requestOptionType,
+                        userName,
+                        groupId
+                    );
+                    setSubmitSuccess(true);
+                    setRequestMenuName('');
+                    setRequestPrice('');
+                    setRequestOptionType('both');
+
+                    // 3초 후 성공 화면 리셋
+                    setTimeout(() => setSubmitSuccess(false), 3000);
+                } catch (err) {
+                    console.error('메뉴 신청 실패:', err);
+                    alert('메뉴 신청에 실패했습니다.');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            // 성공 화면
+            if (submitSuccess) {
+                return (
+                    <div className="flex flex-col items-center justify-center py-20 animate-fade-in-up">
+                        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-4">
+                            <CheckCircle size={40} className="text-green-500" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-800 mb-2">신청 완료!</h3>
+                        <p className="text-sm text-gray-500 text-center">
+                            관리자가 확인 후 메뉴를 추가해드립니다.
+                        </p>
+                    </div>
+                );
+            }
+
+            const OPTION_LABELS: Record<string, string> = {
+                both: '🧊🔥 ICE / HOT 선택가능',
+                ice: '🧊 ICE ONLY',
+                hot: '🔥 HOT ONLY',
+                unknown: '❓ 모름',
+            };
+
+            return (
+                <div className="flex flex-col p-6 bg-white rounded-2xl shadow-sm mx-1 min-h-[460px]">
+                    <div className="flex items-center gap-2 mb-2">
+                        <MessageSquarePlus size={24} className="text-purple-500" />
+                        <h3 className="text-lg font-bold text-gray-800">메뉴 신청</h3>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-6 ml-8">
+                        메뉴판에 없는 메뉴를 관리자에게 신청해주세요.<br />
+                        관리자가 확인 후 메뉴에 추가해드립니다.
+                    </p>
+
+                    <div className="w-full space-y-4 mb-8">
+                        {/* 메뉴 이름 */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1 ml-1">메뉴 이름 *</label>
+                            <div className="relative group">
+                                <Coffee size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
+                                <input
+                                    type="text"
+                                    value={requestMenuName}
+                                    onChange={(e) => setRequestMenuName(e.target.value)}
+                                    placeholder="예) 바닐라 라떼"
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 가격 */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1 ml-1">가격 *</label>
+                            <div className="relative group">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold group-focus-within:text-purple-500 transition-colors">₩</span>
+                                <input
+                                    type="number"
+                                    value={requestPrice}
+                                    onChange={(e) => setRequestPrice(e.target.value)}
+                                    placeholder="가격 입력"
+                                    className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 음료 온도 옵션 */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1 ml-1">음료 온도 옵션 *</label>
+                            <select
+                                value={requestOptionType}
+                                onChange={(e) => setRequestOptionType(e.target.value as 'both' | 'ice' | 'hot' | 'unknown')}
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all appearance-none cursor-pointer"
+                                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%239CA3AF\' d=\'M6 8L1 3h10z\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+                            >
+                                {Object.entries(OPTION_LABELS).map(([value, label]) => (
+                                    <option key={value} value={value}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* 신청자 정보 */}
+                        <div className="bg-gray-50 rounded-xl px-4 py-3">
+                            <p className="text-xs text-gray-400">신청자</p>
+                            <p className="text-sm font-bold text-gray-700">{userName}</p>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleSubmitRequest}
+                        disabled={isSubmitting}
+                        className="w-full bg-purple-500 text-white py-3.5 rounded-xl font-bold hover:bg-purple-600 transition-colors active:scale-95 shadow-md flex items-center justify-center gap-2 mt-auto disabled:bg-gray-300"
+                    >
+                        {isSubmitting ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <>
+                                <Send size={18} />
+                                <span>메뉴 신청하기</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+            );
+        }
     }
 
     // 2. 즐겨찾기 탭 로직 
@@ -237,10 +388,10 @@ const MenuGrid: React.FC<Props> = ({
 
                         <div className="flex w-full gap-2 mt-auto">
                             <div className={`w-full py-2 rounded-xl text-xs font-bold text-center ${menu.hasOption
-                                    ? 'bg-green-50 text-green-600'
-                                    : menu.defaultOption === 'HOT'
-                                        ? 'bg-red-50 text-red-500'
-                                        : 'bg-primary/10 text-primary'
+                                ? 'bg-green-50 text-green-600'
+                                : menu.defaultOption === 'HOT'
+                                    ? 'bg-red-50 text-red-500'
+                                    : 'bg-primary/10 text-primary'
                                 }`}>
                                 {menu.hasOption ? 'ICE / HOT 선택' :
                                     menu.defaultOption === 'HOT' ? '🔥 ONLY HOT' :
