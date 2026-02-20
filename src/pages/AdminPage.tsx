@@ -11,6 +11,7 @@ import {
     SystemStats,
     GroupInfo,
 } from '../features/admin/api/adminApi';
+import AdminMenuManager from '../features/admin/ui/AdminMenuManager';
 import Toast from '../shared/ui/Toast';
 import { ToastMessage } from '../shared/types';
 import {
@@ -37,9 +38,10 @@ import {
     ChevronDown,
     ChevronUp,
     X,
+    Coffee,
 } from 'lucide-react';
 
-type TabType = 'notice' | 'stats' | 'cleanup';
+type TabType = 'notice' | 'stats' | 'cleanup' | 'menu';
 
 const SESSION_KEY = 'nugu_super_admin_auth';
 
@@ -318,6 +320,7 @@ const AdminPage = () => {
         { key: 'notice', label: '공지사항', icon: <Megaphone size={18} /> },
         { key: 'stats', label: '시스템 통계', icon: <BarChart3 size={18} /> },
         { key: 'cleanup', label: '방 청소', icon: <Trash2 size={18} /> },
+        { key: 'menu', label: '메뉴 관리', icon: <Coffee size={18} /> },
     ];
 
     // ─── 세션 체크 중 로딩 ───
@@ -1071,6 +1074,11 @@ const AdminPage = () => {
                             </>
                         )}
                     </div>
+                )}
+
+                {/* ===== 메뉴 관리 탭 ===== */}
+                {activeTab === 'menu' && (
+                    <AdminMenuManager addToast={addToast} />
                 )}
             </main>
         </div>
