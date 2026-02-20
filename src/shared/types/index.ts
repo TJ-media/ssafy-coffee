@@ -111,3 +111,15 @@ export interface RouletteHistory {
   totalPrice: number;
   paid?: boolean;
 }
+
+export interface MenuRequest {
+  id: string;
+  menuName: string;
+  price: number;
+  optionType: 'both' | 'ice' | 'hot' | 'unknown';
+  requesterName: string;
+  groupId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+  resolvedAt?: any;
+}
