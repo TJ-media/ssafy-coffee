@@ -42,7 +42,7 @@ const OrderPage = () => {
 
     const subCategories = useMemo(() => {
         if (selectedCategory === '메뉴 추가') {
-            return ['직접 입력', '최근 기록'];
+            return ['직접 입력', '최근 기록', '메뉴 신청'];
         }
 
         const filtered = allMenus.filter(m => m.categoryUpper === selectedCategory);
@@ -336,6 +336,8 @@ const OrderPage = () => {
                         customMenus={state.myCustomMenus}
                         onSaveCustomMenu={actions.saveCustomMenuHandler}
                         onDeleteCustomMenu={actions.deleteCustomMenuHandler}
+                        groupId={state.groupId || ''}
+                        userName={state.userName}
                     />
                 </div>
             )}
