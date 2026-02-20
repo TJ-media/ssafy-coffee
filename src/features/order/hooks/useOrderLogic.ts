@@ -3,55 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/useOrderStore';
 
 /**
- * useOrderLogic - Zustand 스토어 래퍼 훅
- *
- * 기존 인터페이스({ state, actions })를 유지하면서 내부적으로 useOrderStore를 사용합니다.
- * Firestore onSnapshot 리스너의 라이프사이클을 컴포넌트에 맞게 관리합니다.
+ * useOrderInitialize
+ * * Firebase 실시간 구독 및 해제 생명주기만 관리합니다.
+ * Zustand 안티패턴(전체 스토어 구독으로 인한 무한 리렌더링)을 방지하기 위해
+ * 상태를 통째로 반환하지 않고 초기화 로직에만 집중합니다.
  */
-export const useOrderLogic = () => {
+export const useOrderInitialize = () => {
   const navigate = useNavigate();
-  const store = useOrderStore();
+  const initializeStore = useOrderStore(state => state.initializeStore);
+  const cleanup = useOrderStore(state => state.cleanup);
 
-  // Firestore 구독 시작/해제를 컴포넌트 라이프사이클에 맞춤
   useEffect(() => {
-    store.initializeStore(navigate);
+    initializeStore(navigate);
     return () => {
-      store.cleanup();
+      cleanup();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return {
-    state: {
-      groupId: store.groupId,
-      userName: store.userName,
-      cart: store.cart,
-      totalPrice: store.totalPrice,
-      history: store.history,
-      rouletteHistory: store.rouletteHistory,
-      rouletteGame: store.rouletteGame,
-      marbleCounts: store.marbleCounts,
-      toasts: store.toasts,
-      favoriteMenuIds: store.favoriteMenuIds,
-      isCartOpen: store.isCartOpen,
-      isHistoryOpen: store.isHistoryOpen,
-      editingHistoryInfo: store.editingHistoryInfo,
-      isRouletteModalOpen: store.isRouletteModalOpen,
-      myCustomMenus: store.myCustomMenus,
-      password: store.password,
-    },
-    actions: {
-      setIsCartOpen: store.setIsCartOpen,
-      setIsHistoryOpen: store.setIsHistoryOpen,
-      setEditingHistoryInfo: store.setEditingHistoryInfo,
-      addToast: store.addToast,
-      removeToast: store.removeToast,
-      toggleFavoriteHandler: store.toggleFavoriteHandler,
-      addToCartHandler: store.addToCartHandler,
-      handleCloseRoulette: store.handleCloseRoulette,
-      handleStartRoulette: store.handleStartRoulette,
-      saveCustomMenuHandler: store.saveCustomMenuHandler,
-      deleteCustomMenuHandler: store.deleteCustomMenuHandler,
-    },
-  };
+  }, [initializeStore, cleanup, navigate]);
 };
