@@ -32,7 +32,7 @@ export const useMenuData = (): UseMenuDataReturn => {
             (snapshot) => {
                 if (snapshot.exists()) {
                     const data = snapshot.data() as MenuData;
-                    setMenus(data.items || []);
+                    setMenus((data.items || []).sort((a, b) => a.id - b.id));
                     setCategories(data.categories || []);
                 } else {
                     setError('메뉴 데이터를 찾을 수 없습니다.');
