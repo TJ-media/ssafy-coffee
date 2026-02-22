@@ -1,7 +1,8 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { ShoppingCart, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useOrderLogic } from '../features/order/hooks/useOrderLogic';
+import { useOrderInitialize } from '../features/order/hooks/useOrderLogic';
+import { useOrderStore } from '../features/order/store/useOrderStore';
 import { useMenuData } from '../features/menu/hooks/useMenuData';
 import { useMenuSearch } from '../features/order/hooks/useMenuSearch';
 import MenuGrid from '../features/order/ui/MenuGrid';
@@ -18,11 +19,45 @@ import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi } f
 import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType } from '../shared/types';
 
 const OrderPage = () => {
-    const { state, actions } = useOrderLogic();
+    // 1. Firebase 실시간 구독 생명주기 연결
+    useOrderInitialize();
+
     const { menus: allMenus, categories } = useMenuData();
     const navigate = useNavigate();
     const { searchQuery, setSearchQuery, isSearchMode, setIsSearchMode, searchResults, convertedQuery, clearSearch } = useMenuSearch(allMenus);
 
+    // 2. Zustand 선택적 구독 (Selector를 통해 필요한 상태만 개별 구독하여 렌더링 방어)
+    const groupId = useOrderStore(state => state.groupId);
+    const userName = useOrderStore(state => state.userName);
+    const cart = useOrderStore(state => state.cart);
+    const totalPrice = useOrderStore(state => state.totalPrice);
+    const history = useOrderStore(state => state.history);
+    const rouletteHistory = useOrderStore(state => state.rouletteHistory);
+    const rouletteGame = useOrderStore(state => state.rouletteGame);
+    const marbleCounts = useOrderStore(state => state.marbleCounts);
+    const toasts = useOrderStore(state => state.toasts);
+    const favoriteMenuIds = useOrderStore(state => state.favoriteMenuIds);
+    const isCartOpen = useOrderStore(state => state.isCartOpen);
+    const isHistoryOpen = useOrderStore(state => state.isHistoryOpen);
+    const editingHistoryInfo = useOrderStore(state => state.editingHistoryInfo);
+    const isRouletteModalOpen = useOrderStore(state => state.isRouletteModalOpen);
+    const myCustomMenus = useOrderStore(state => state.myCustomMenus);
+    const password = useOrderStore(state => state.password);
+
+    // 액션들 (함수는 레퍼런스가 변하지 않으므로 리렌더링을 유발하지 않음)
+    const setIsCartOpen = useOrderStore(state => state.setIsCartOpen);
+    const setIsHistoryOpen = useOrderStore(state => state.setIsHistoryOpen);
+    const setEditingHistoryInfo = useOrderStore(state => state.setEditingHistoryInfo);
+    const addToast = useOrderStore(state => state.addToast);
+    const removeToast = useOrderStore(state => state.removeToast);
+    const toggleFavoriteHandler = useOrderStore(state => state.toggleFavoriteHandler);
+    const addToCartHandler = useOrderStore(state => state.addToCartHandler);
+    const handleCloseRoulette = useOrderStore(state => state.handleCloseRoulette);
+    const handleStartRoulette = useOrderStore(state => state.handleStartRoulette);
+    const saveCustomMenuHandler = useOrderStore(state => state.saveCustomMenuHandler);
+    const deleteCustomMenuHandler = useOrderStore(state => state.deleteCustomMenuHandler);
+
+    // 3. 페이지 내부 컴포넌트 상태
     const [selectedCategory, setSelectedCategory] = useState('커피');
     const [selectedSubCategory, setSelectedSubCategory] = useState('전체');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -50,7 +85,6 @@ const OrderPage = () => {
         return ['전체', ...uniqueLowers];
     }, [selectedCategory, allMenus]);
 
-    // Firestore 메뉴에서 '추가' 카테고리 아이템만 필터 (MenuOptionModal용)
     const addonMenus = useMemo(() => {
         return allMenus.filter(m => m.categoryUpper === '추가');
     }, [allMenus]);
@@ -69,7 +103,7 @@ const OrderPage = () => {
         let targetX = window.innerWidth - 50;
         let targetY = window.innerHeight - 50;
 
-        const targetEl = state.isCartOpen ? cartSheetRef.current : cartFabRef.current;
+        const targetEl = isCartOpen ? cartSheetRef.current : cartFabRef.current;
         if (targetEl) {
             const rect = targetEl.getBoundingClientRect();
             targetX = rect.left + rect.width / 2;
@@ -83,16 +117,14 @@ const OrderPage = () => {
 
     const handleAddToCartWrapper = async (e: React.MouseEvent, menu: any, option: any) => {
         triggerFlyAnimation(e, '#3a9df2');
-        await actions.addToCartHandler(menu.name, menu.price, option, menu.categoryUpper);
+        await addToCartHandler(menu.name, menu.price, option, menu.categoryUpper);
     };
 
-    // 👈 모달에서 담기 시 호출되는 핸들러
     const handleModalAddToCart = async (e: React.MouseEvent, menuName: string, price: number, option: OptionType, category: string) => {
         triggerFlyAnimation(e, '#3a9df2');
-        await actions.addToCartHandler(menuName, price, option, category);
+        await addToCartHandler(menuName, price, option, category);
     };
 
-    // 👈 메뉴 카드 클릭 시 모달 열기
     const handleMenuSelect = (menu: Menu) => {
         setSelectedMenu(menu);
         setIsMenuModalOpen(true);
@@ -100,7 +132,7 @@ const OrderPage = () => {
 
     const handleHistoryAddMode = (historyId: string, type: 'normal' | 'roulette') => {
         const isNormal = type === 'normal';
-        const targetList = isNormal ? state.history : state.rouletteHistory;
+        const targetList = isNormal ? history : rouletteHistory;
         const targetObj = targetList.find(h => h.id === historyId);
         let currentCount = 0;
         if (targetObj) {
@@ -108,18 +140,18 @@ const OrderPage = () => {
             const items = isNormal ? targetObj.items : targetObj.orderItems;
             currentCount = items ? items.reduce((sum: number, i: any) => sum + i.count, 0) : 0;
         }
-        actions.setEditingHistoryInfo({
+        setEditingHistoryInfo({
             id: historyId, type, count: currentCount, animationKey: Date.now()
         });
-        actions.setIsHistoryOpen(false);
-        actions.setIsCartOpen(false);
-        actions.addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
+        setIsHistoryOpen(false);
+        setIsCartOpen(false);
+        addToast('메뉴를 선택하면 바로 추가됩니다!', 'success');
     };
 
     const handleDeleteItem = async (historyId: string, type: 'normal' | 'roulette', index: number, targetUser?: string) => {
-        if (!state.groupId) return;
+        if (!groupId) return;
         const isNormal = type === 'normal';
-        const list = isNormal ? state.history : state.rouletteHistory;
+        const list = isNormal ? history : rouletteHistory;
         const targetIdx = list.findIndex(h => h.id === historyId);
         if (targetIdx === -1) return;
 
@@ -149,23 +181,21 @@ const OrderPage = () => {
         const updatedList = list.map((h, i) => i === targetIdx ? targetHistory : h);
 
         if (isNormal) {
-            await updateHistoryApi(state.groupId, updatedList as OrderHistory[], 'normal');
+            await updateHistoryApi(groupId, updatedList as OrderHistory[], 'normal');
         } else {
-            await updateHistoryApi(state.groupId, updatedList as RouletteHistory[], 'roulette');
+            await updateHistoryApi(groupId, updatedList as RouletteHistory[], 'roulette');
         }
 
-        actions.addToast('삭제되었습니다');
+        addToast('삭제되었습니다');
     };
 
-    // 👇 주문 완료 핸들러: 카트를 OrderHistory로 변환 후 저장, 카트 비움
     const handleOrderComplete = async () => {
-        if (!state.groupId || state.cart.length === 0) return;
+        if (!groupId || cart.length === 0) return;
         if (!confirm('정말 주문을 완료하시겠습니까?')) return;
 
         try {
-            // 카트 아이템을 HistoryItem 형태로 그룹화
             const itemMap: Record<string, HistoryItem> = {};
-            state.cart.forEach(cartItem => {
+            cart.forEach(cartItem => {
                 const key = `${cartItem.menuName}_${cartItem.option}`;
                 if (!itemMap[key]) {
                     itemMap[key] = {
@@ -181,35 +211,34 @@ const OrderPage = () => {
             });
 
             const historyItems = Object.values(itemMap);
-            const participants = [...new Set(state.cart.map(c => c.userName))];
+            const participants = [...new Set(cart.map(c => c.userName))];
 
             const newHistory: OrderHistory = {
                 id: Date.now().toString(),
                 orderedAt: new Date(),
-                totalPrice: state.totalPrice,
-                totalItems: state.cart.length,
+                totalPrice: totalPrice,
+                totalItems: cart.length,
                 items: historyItems,
                 participants,
                 winner: null
             };
 
-            const updatedHistory = [newHistory, ...state.history];
-            await updateHistoryApi(state.groupId, updatedHistory, 'normal');
-            await updateCartApi(state.groupId, []);
+            const updatedHistory = [newHistory, ...history];
+            await updateHistoryApi(groupId, updatedHistory, 'normal');
+            await updateCartApi(groupId, []);
 
-            actions.setIsCartOpen(false);
-            actions.addToast('주문이 완료되었습니다!', 'success');
+            setIsCartOpen(false);
+            addToast('주문이 완료되었습니다!', 'success');
         } catch (e) {
             console.error('주문 완료 실패:', e);
-            actions.addToast('주문 완료에 실패했습니다.', 'warning');
+            addToast('주문 완료에 실패했습니다.', 'warning');
         }
     };
 
-    // 👇 결제자 업데이트 핸들러
     const handleUpdateWinner = async (historyId: string, type: 'normal' | 'roulette', winner: string) => {
-        if (!state.groupId) return;
+        if (!groupId) return;
         const isNormal = type === 'normal';
-        const list = isNormal ? [...state.history] : [...state.rouletteHistory];
+        const list = isNormal ? [...history] : [...rouletteHistory];
         const targetIdx = list.findIndex(h => h.id === historyId);
         if (targetIdx === -1) return;
 
@@ -217,16 +246,16 @@ const OrderPage = () => {
         list[targetIdx] = updated;
 
         if (isNormal) {
-            await updateHistoryApi(state.groupId, list as OrderHistory[], 'normal');
+            await updateHistoryApi(groupId, list as OrderHistory[], 'normal');
         } else {
-            await updateHistoryApi(state.groupId, list as RouletteHistory[], 'roulette');
+            await updateHistoryApi(groupId, list as RouletteHistory[], 'roulette');
         }
-        actions.addToast(`${winner}님이 결제자로 지정되었습니다.`, 'success');
+        addToast(`${winner}님이 결제자로 지정되었습니다.`, 'success');
     };
 
     return (
         <div className="h-full flex flex-col bg-background relative overflow-hidden">
-            <Toast toasts={state.toasts} removeToast={actions.removeToast} />
+            <Toast toasts={toasts} removeToast={removeToast} />
 
             <style>{`
           @keyframes flyFromCenter {
@@ -240,36 +269,36 @@ const OrderPage = () => {
             <FlyingBall items={flyingItems} />
 
             <HistoryModal
-                isOpen={state.isHistoryOpen}
-                onClose={() => { actions.setIsHistoryOpen(false); actions.setEditingHistoryInfo(null); }}
-                history={state.history}
-                rouletteHistory={state.rouletteHistory}
-                groupId={state.groupId || ''}
-                userName={state.userName}
+                isOpen={isHistoryOpen}
+                onClose={() => { setIsHistoryOpen(false); setEditingHistoryInfo(null); }}
+                history={history}
+                rouletteHistory={rouletteHistory}
+                groupId={groupId || ''}
+                userName={userName}
                 onAddMode={handleHistoryAddMode}
                 onDeleteItem={handleDeleteItem}
                 onUpdateWinner={handleUpdateWinner}
             />
 
             <RouletteModal
-                isOpen={state.isRouletteModalOpen}
-                onClose={actions.handleCloseRoulette}
-                groupId={state.groupId || ''}
-                participants={state.rouletteGame?.participants || []}
-                gameState={state.rouletteGame}
-                cart={state.cart}
-                marbleCounts={state.marbleCounts}
+                isOpen={isRouletteModalOpen}
+                onClose={handleCloseRoulette}
+                groupId={groupId || ''}
+                participants={rouletteGame?.participants || []}
+                gameState={rouletteGame}
+                cart={cart}
+                marbleCounts={marbleCounts}
             />
 
             <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
-                groupId={state.groupId || ''}
+                groupId={groupId || ''}
             />
 
             <OrderHeader
-                userName={state.userName}
-                groupId={state.groupId || ''}
+                userName={userName}
+                groupId={groupId || ''}
                 selectedCategory={selectedCategory}
                 selectedSubCategory={selectedSubCategory}
                 subCategories={subCategories}
@@ -277,13 +306,13 @@ const OrderPage = () => {
                 onSelectCategory={setSelectedCategory}
                 onSelectSubCategory={setSelectedSubCategory}
                 onCopyLink={async () => {
-                    const token = await createInviteTokenApi(state.groupId || '', state.password);
+                    const token = await createInviteTokenApi(groupId || '', password);
                     const inviteUrl = `${window.location.origin}/?invite=${token}`;
                     navigator.clipboard.writeText(inviteUrl);
-                    actions.addToast('초대 링크가 복사되었습니다!', 'success');
+                    addToast('초대 링크가 복사되었습니다!', 'success');
                 }}
-                onOpenHistory={() => actions.setIsHistoryOpen(true)}
-                onOpenPinball={actions.handleStartRoulette}
+                onOpenHistory={() => setIsHistoryOpen(true)}
+                onOpenPinball={handleStartRoulette}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onLogout={handleLogout}
                 onToggleSearch={() => {
@@ -296,7 +325,7 @@ const OrderPage = () => {
                 isSearchMode={isSearchMode}
             />
 
-            {state.editingHistoryInfo && (
+            {editingHistoryInfo && (
                 <div className="bg-primary text-white text-center py-2 text-sm font-bold animate-pulse shadow-md relative z-20">
                     ✨ 지난 주문 내역을 수정 중입니다 (메뉴를 터치하세요)
                 </div>
@@ -328,60 +357,60 @@ const OrderPage = () => {
                     <MenuGrid
                         selectedCategory={selectedCategory}
                         selectedSubCategory={selectedSubCategory}
-                        favoriteMenuIds={state.favoriteMenuIds}
-                        onToggleFavorite={actions.toggleFavoriteHandler}
+                        favoriteMenuIds={favoriteMenuIds}
+                        onToggleFavorite={toggleFavoriteHandler}
                         onAddToCart={handleAddToCartWrapper}
                         onMenuSelect={handleMenuSelect}
                         menus={allMenus}
-                        customMenus={state.myCustomMenus}
-                        onSaveCustomMenu={actions.saveCustomMenuHandler}
-                        onDeleteCustomMenu={actions.deleteCustomMenuHandler}
-                        groupId={state.groupId || ''}
-                        userName={state.userName}
+                        customMenus={myCustomMenus}
+                        onSaveCustomMenu={saveCustomMenuHandler}
+                        onDeleteCustomMenu={deleteCustomMenuHandler}
+                        groupId={groupId || ''}
+                        userName={userName}
                     />
                 </div>
             )}
 
-            {!state.isCartOpen && (
+            {!isCartOpen && (
                 <button
-                    key={state.editingHistoryInfo ? `edit-${state.editingHistoryInfo.animationKey}` : 'cart-fab'}
+                    key={editingHistoryInfo ? `edit-${editingHistoryInfo.animationKey}` : 'cart-fab'}
                     ref={cartFabRef}
                     onClick={() => {
-                        if (state.editingHistoryInfo) actions.setIsHistoryOpen(true);
-                        else actions.setIsCartOpen(true);
+                        if (editingHistoryInfo) setIsHistoryOpen(true);
+                        else setIsCartOpen(true);
                     }}
                     className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform active:scale-95 
-                  ${state.editingHistoryInfo
-                            ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
-                            : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
+                  ${editingHistoryInfo
+                        ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
+                        : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
                 >
                     <div className="relative">
-                        {state.editingHistoryInfo ? <Pencil size={28} /> : <ShoppingCart size={28} />}
-                        {(state.editingHistoryInfo ? state.editingHistoryInfo.count : state.cart.length) > 0 && (
+                        {editingHistoryInfo ? <Pencil size={28} /> : <ShoppingCart size={28} />}
+                        {(editingHistoryInfo ? editingHistoryInfo.count : cart.length) > 0 && (
                             <span className="absolute -top-2 -right-2 bg-danger text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white">
-                                {state.editingHistoryInfo ? state.editingHistoryInfo.count : state.cart.length}
+                                {editingHistoryInfo ? editingHistoryInfo.count : cart.length}
                             </span>
                         )}
                     </div>
                 </button>
             )}
 
-            {state.isCartOpen && !state.editingHistoryInfo && (
+            {isCartOpen && !editingHistoryInfo && (
                 <CartSheet
-                    cart={state.cart}
-                    totalPrice={state.totalPrice}
-                    userName={state.userName}
+                    cart={cart}
+                    totalPrice={totalPrice}
+                    userName={userName}
                     cartFabRef={cartFabRef}
                     cartSheetRef={cartSheetRef}
                     onRemove={async (name, option) => {
-                        const target = state.cart.find(i => i.menuName === name && i.option === option && i.userName === state.userName);
-                        if (target && state.groupId) await updateCartApi(state.groupId, state.cart.filter(c => c.id !== target.id));
+                        const target = cart.find(i => i.menuName === name && i.option === option && i.userName === userName);
+                        if (target && groupId) await updateCartApi(groupId, cart.filter(c => c.id !== target.id));
                     }}
                     onAdd={async (name, price, option, category) => {
-                        if (state.groupId) await addToCartApi(state.groupId, { id: Date.now(), userName: state.userName, menuName: name, price, option, category: category || '' });
+                        if (groupId) await addToCartApi(groupId, { id: Date.now(), userName: userName, menuName: name, price, option, category: category || '' });
                     }}
                     onClear={handleOrderComplete}
-                    onClose={() => actions.setIsCartOpen(false)}
+                    onClose={() => setIsCartOpen(false)}
                     onEdit={() => { }}
                 />
             )}
