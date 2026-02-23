@@ -45,7 +45,7 @@ export const startRouletteGameApi = async (groupId: string, participants: string
         rouletteGame: {
             status: 'waiting',
             participants,
-            seed: Math.random(),
+            seed: Date.now(),
             startedAt: Date.now(),
             chatMessages: [],
             hostName
