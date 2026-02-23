@@ -36,6 +36,7 @@ export class Roulette extends EventTarget {
 
   private _gameStartTime: number = 0;
   private _executedSteps: number = 0;
+  private _pendingRemovals: { id: number; removeAtStep: number }[] = [];
 
   private _animationFrameId: number = 0;
   private _isDestroyed: boolean = false;
@@ -112,8 +113,8 @@ export class Roulette extends EventTarget {
 
     // 게임이 실행 중일 때만 스텝 동기화 적용
     if (this._gameStartTime > 0) {
-      // 배속 적용
-      const effectiveSpeed = this._speed * (this.fastForwarder ? this.fastForwarder.speed : 1);
+      // 게임 실행 중에는 배속 비활성화 (결정론적 시뮬레이션 보장)
+      const effectiveSpeed = this._speed;
 
       // 절대 경과 시간으로 실행해야 할 총 스텝 수 계산 (프레임레이트 무관)
       const totalElapsed = (currentTime - this._gameStartTime) * effectiveSpeed;
@@ -123,6 +124,15 @@ export class Roulette extends EventTarget {
       const stepsToRun = Math.min(targetSteps - this._executedSteps, 10);
 
       for (let i = 0; i < stepsToRun; i++) {
+        // 스텝 기반 마블 제거 처리
+        this._pendingRemovals = this._pendingRemovals.filter(entry => {
+          if (this._executedSteps >= entry.removeAtStep) {
+            this.physics.removeMarble(entry.id);
+            return false;
+          }
+          return true;
+        });
+
         this.physics.step(intervalSeconds);
 
         // sort를 step 내부에서 실행 — 모든 클라이언트가 동일 순서로 마블 처리
@@ -209,9 +219,11 @@ export class Roulette extends EventTarget {
             this._recorder?.stop();
           }, 1000);
         }
-        setTimeout(() => {
-          this.physics.removeMarble(marble.id);
-        }, 500);
+        // 500ms → 50 스텝 (updateInterval=10ms) — 결정론적 제거
+        this._pendingRemovals.push({
+          id: marble.id,
+          removeAtStep: this._executedSteps + 50,
+        });
       }
     }
 
@@ -462,6 +474,7 @@ export class Roulette extends EventTarget {
     this._winnerRank = -1;
     this._gameStartTime = 0;
     this._executedSteps = 0;
+    this._pendingRemovals = [];
     this._isRunning = false;
   }
 
