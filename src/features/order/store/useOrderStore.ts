@@ -109,7 +109,13 @@ export const useOrderStore = create<OrderState & OrderActions>((set, get) => ({
     // ═══════════════════════════════════════════
 
     initializeStore: (navigate) => {
-        const { groupId } = get();
+        // 스토어 초기값이 아닌 localStorage에서 최신 값을 읽어옴
+        const groupId = localStorage.getItem('ssafy_groupId');
+        const userName = localStorage.getItem('ssafy_userName') || '익명';
+
+        // 스토어 상태를 최신 값으로 업데이트
+        set({ groupId, userName });
+
         if (!groupId) {
             navigate('/');
             return;
