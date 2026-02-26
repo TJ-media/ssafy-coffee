@@ -1,0 +1,15 @@
+// firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // groups 컬렉션 내의 문서(모임 데이터)들에 대해서만 읽기 및 쓰기 허용
+    match /groups/{groupId} {
+      allow read, write: if true;
+    }
+
+    // 그 외의 모든 경로에 대해서는 접근을 완전히 차단
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
