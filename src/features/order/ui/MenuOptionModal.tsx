@@ -13,19 +13,20 @@ interface Props {
     addonMenus: Menu[];
     onClose: () => void;
     onAddToCart: (e: React.MouseEvent, menuName: string, price: number, option: OptionType, category: string) => void;
+    initialOption?: OptionType;
 }
 
-const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart }) => {
+const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart, initialOption }) => {
     const [selectedOption, setSelectedOption] = useState<OptionType>('ICE');
     const [addonSelections, setAddonSelections] = useState<AddonSelection[]>([]);
 
     // 메뉴가 바뀔 때마다 상태 초기화
     React.useEffect(() => {
         if (menu) {
-            setSelectedOption(menu.hasOption ? 'ICE' : 'ONLY');
+            setSelectedOption(initialOption || (menu.hasOption ? 'ICE' : 'ONLY'));
             setAddonSelections([]);
         }
-    }, [menu]);
+    }, [menu, initialOption]);
 
     if (!isOpen || !menu) return null;
 

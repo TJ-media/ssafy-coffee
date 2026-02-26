@@ -65,6 +65,7 @@ const OrderPage = () => {
     const cartSheetRef = useRef<HTMLDivElement>(null);
     const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
     const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
+    const [selectedInitialOption, setSelectedInitialOption] = useState<OptionType | undefined>(undefined);
     const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
 
     useEffect(() => {
@@ -125,8 +126,9 @@ const OrderPage = () => {
         await addToCartHandler(menuName, price, option, category);
     };
 
-    const handleMenuSelect = (menu: Menu) => {
+    const handleMenuSelect = (menu: Menu, initialOption?: OptionType) => {
         setSelectedMenu(menu);
+        setSelectedInitialOption(initialOption);
         setIsMenuModalOpen(true);
     };
 
@@ -378,8 +380,9 @@ const OrderPage = () => {
                 isOpen={isMenuModalOpen}
                 menu={selectedMenu}
                 addonMenus={addonMenus}
-                onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); }}
+                onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); setSelectedInitialOption(undefined); }}
                 onAddToCart={handleModalAddToCart}
+                initialOption={selectedInitialOption}
             />
 
             {isSearchMode && (
