@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Link, History, Target, LogOut, Heart, ChevronLeft, ChevronRight, Settings, Search } from 'lucide-react';
+import { Link, History, Target, LogOut, Heart, ChevronLeft, ChevronRight, Settings, Search, ChevronDown } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 import { CAFE_LIST } from '../../../menuData';
 
@@ -20,13 +20,14 @@ interface Props {
     onToggleSearch: () => void;
     isSearchMode: boolean;
     selectedCafe?: string;
+    onChangeCafe?: () => void;
 }
 
 const OrderHeader: React.FC<Props> = ({
     groupId, userName, selectedCategory, selectedSubCategory,
     onSelectCategory, onSelectSubCategory, subCategories, categories,
     onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout,
-    onToggleSearch, isSearchMode, selectedCafe
+    onToggleSearch, isSearchMode, selectedCafe, onChangeCafe
 }) => {
     const categoryScrollRef = useRef<HTMLDivElement>(null);
     const subCategoryScrollRef = useRef<HTMLDivElement>(null);
@@ -72,8 +73,14 @@ const OrderHeader: React.FC<Props> = ({
                     <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shadow-inner shrink-0" style={{ backgroundColor: getAvatarColor(userName), color: getTextContrastColor() }}>
                         {userName.slice(0, 3)}
                     </div>
-                    <div className="min-w-0">
-                        <h2 className="text-lg font-bold text-text-primary">{CAFE_LIST.find(c => c.id === selectedCafe)?.name || '카페'}</h2>
+                    <div
+                        className="min-w-0 cursor-pointer group/cafe"
+                        onClick={onChangeCafe}
+                    >
+                        <div className="flex items-center gap-1">
+                            <h2 className="text-lg font-bold text-text-primary group-hover/cafe:text-primary transition-colors">{CAFE_LIST.find(c => c.id === selectedCafe)?.name || '카페'}</h2>
+                            <ChevronDown size={16} className="text-gray-400 group-hover/cafe:text-primary transition-colors" />
+                        </div>
                         <p className="text-xs text-text-secondary truncate">{groupId}</p>
                     </div>
                 </div>
