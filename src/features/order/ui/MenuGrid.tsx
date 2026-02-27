@@ -9,7 +9,7 @@ interface Props {
     favoriteMenuIds: number[];
     onAddToCart: (e: React.MouseEvent, menu: Menu, option: OptionType) => void;
     onToggleFavorite: (menu: Menu) => void;
-    onMenuSelect: (menu: Menu) => void;
+    onMenuSelect: (menu: Menu, initialOption?: OptionType) => void;
     menus: Menu[];
     customMenus: Menu[];
     onSaveCustomMenu: (menu: Menu) => void;
@@ -387,16 +387,32 @@ const MenuGrid: React.FC<Props> = ({
                         </p>
 
                         <div className="flex w-full gap-2 mt-auto">
-                            <div className={`w-full py-2 rounded-xl text-xs font-bold text-center ${menu.hasOption
-                                ? 'bg-green-50 text-green-600'
-                                : menu.defaultOption === 'HOT'
-                                    ? 'bg-red-50 text-red-500'
-                                    : 'bg-primary/10 text-primary'
-                                }`}>
-                                {menu.hasOption ? 'ICE / HOT 선택' :
-                                    menu.defaultOption === 'HOT' ? '🔥 ONLY HOT' :
-                                        menu.defaultOption === 'ICE' ? '🧊 ONLY ICE' : '선택하기'}
-                            </div>
+                            {menu.hasOption ? (
+                                <>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, 'ICE'); }}
+                                        className="flex-1 py-2 rounded-xl text-xs font-bold text-center bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        <Snowflake size={12} /> ICE
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, 'HOT'); }}
+                                        className="flex-1 py-2 rounded-xl text-xs font-bold text-center bg-red-50 text-red-500 hover:bg-red-100 transition-colors active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        <Flame size={12} /> HOT
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, menu.defaultOption === 'HOT' ? 'HOT' : 'ICE'); }}
+                                    className={`w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition-colors active:scale-95 ${menu.defaultOption === 'HOT'
+                                            ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                        }`}>
+                                    {menu.defaultOption === 'HOT' ? <><Flame size={12} /> ONLY HOT</> :
+                                        menu.defaultOption === 'ICE' ? <><Snowflake size={12} /> ONLY ICE</> : '선택하기'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}

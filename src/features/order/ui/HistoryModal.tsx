@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { OrderHistory, RouletteHistory, HistoryItem } from '../../../shared/types';
-import { X, Coffee, Plus, Trash2, Pencil, Check, TrendingUp, TrendingDown, BarChart2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { X, Coffee, Plus, Minus, Pencil, Check, TrendingUp, TrendingDown, BarChart2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 import dayjs from 'dayjs';
 
@@ -14,9 +14,10 @@ interface Props {
   onAddMode: (historyId: string, type: 'normal' | 'roulette') => void;
   onDeleteItem: (historyId: string, type: 'normal' | 'roulette', itemIndex: number, targetUser?: string) => void;
   onUpdateWinner: (historyId: string, type: 'normal' | 'roulette', winner: string) => void;
+  onAddItem: (historyId: string, type: 'normal' | 'roulette', itemIndex: number) => void;
 }
 
-const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onAddMode, onDeleteItem, onUpdateWinner }: Props) => {
+const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onAddMode, onDeleteItem, onUpdateWinner, onAddItem }: Props) => {
   const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [coffeePrice, setCoffeePrice] = useState<string>('4500');
@@ -287,25 +288,51 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
                                     <span className="font-bold text-sm text-text-primary">{item.menuName}<span className="text-xs font-normal text-text-secondary ml-1">x {item.count}</span></span>
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.option === 'ICE' ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>{item.option === 'ONLY' ? '-' : item.option}</span>
                                   </div>
-                                  <div className="flex flex-wrap gap-1 mt-1">{item.orderedBy.map((p, i) => <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">{p}</span>)}</div>
+                                  <div className="flex -space-x-2 mt-1">
+                                    {item.orderedBy.map((p, i) => (
+                                      <div
+                                        key={i}
+                                        className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold shadow-sm"
+                                        style={{ backgroundColor: getAvatarColor(p), color: getTextContrastColor() }}
+                                        title={p}
+                                      >
+                                        {p.slice(0, 1)}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   <span className="text-sm font-bold text-text-primary">{(item.price * item.count).toLocaleString()}원</span>
-                                  {isEditing && canDelete && (
-                                    <button
-                                      onClick={() => handleDeleteClick(h, h.type, item, idx)}
-                                      className="w-7 h-7 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
+                                  {isEditing && (
+                                    <div className="flex items-center bg-white rounded-lg border border-gray-200 h-8 overflow-hidden">
+                                      <button
+                                        onClick={() => handleDeleteClick(h, h.type, item, idx)}
+                                        disabled={!canDelete}
+                                        className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                                      >
+                                        <Minus size={14} />
+                                      </button>
+                                      <span className="w-8 text-center text-sm font-bold text-text-primary">{item.count}</span>
+                                      <button
+                                        onClick={() => onAddItem(h.id, h.type, idx)}
+                                        className="w-8 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
                             );
                           })}
                         </div>
+                        {/* 총액 표시 */}
+                        <div className="flex justify-between items-center mt-4 pt-3 border-t border-dashed">
+                          <span className="text-sm font-bold text-text-secondary">총액</span>
+                          <span className="text-base font-bold text-primary">{(h.totalPrice ?? 0).toLocaleString()}원</span>
+                        </div>
                         {isEditing && (
-                          <button onClick={() => onAddMode(h.id, h.type)} className="w-full mt-4 py-3 bg-primary/10 text-primary rounded-xl font-bold text-sm hover:bg-primary/20 flex items-center justify-center gap-2"><Plus size={16} /> 메뉴 추가하기</button>
+                          <button onClick={() => onAddMode(h.id, h.type)} className="w-full mt-3 py-3 bg-primary/10 text-primary rounded-xl font-bold text-sm hover:bg-primary/20 flex items-center justify-center gap-2"><Plus size={16} /> 메뉴 추가하기</button>
                         )}
                       </div>
                     );

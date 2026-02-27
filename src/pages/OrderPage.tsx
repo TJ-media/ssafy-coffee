@@ -65,6 +65,7 @@ const OrderPage = () => {
     const cartSheetRef = useRef<HTMLDivElement>(null);
     const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
     const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
+    const [selectedInitialOption, setSelectedInitialOption] = useState<OptionType | undefined>(undefined);
     const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
 
     useEffect(() => {
@@ -125,8 +126,9 @@ const OrderPage = () => {
         await addToCartHandler(menuName, price, option, category);
     };
 
-    const handleMenuSelect = (menu: Menu) => {
+    const handleMenuSelect = (menu: Menu, initialOption?: OptionType) => {
         setSelectedMenu(menu);
+        setSelectedInitialOption(initialOption);
         setIsMenuModalOpen(true);
     };
 
@@ -253,6 +255,39 @@ const OrderPage = () => {
         addToast(`${winner}님이 결제자로 지정되었습니다.`, 'success');
     };
 
+    const handleAddItemToHistory = async (historyId: string, type: 'normal' | 'roulette', index: number) => {
+        if (!groupId) return;
+        const isNormal = type === 'normal';
+        const list = isNormal ? [...history] : [...rouletteHistory];
+        const targetIdx = list.findIndex(h => h.id === historyId);
+        if (targetIdx === -1) return;
+
+        const targetHistory = { ...list[targetIdx] };
+        // @ts-ignore
+        const items = isNormal ? [...targetHistory.items] : [...targetHistory.orderItems];
+        const item = { ...items[index] };
+
+        item.orderedBy = [...item.orderedBy, userName];
+        item.count += 1;
+        targetHistory.totalPrice = (targetHistory.totalPrice || 0) + item.price;
+        items[index] = item;
+
+        // @ts-ignore
+        if (isNormal) targetHistory.items = items;
+        else { // @ts-ignore
+            targetHistory.orderItems = items;
+        }
+
+        const updatedList = list.map((h, i) => i === targetIdx ? targetHistory : h);
+
+        if (isNormal) {
+            await updateHistoryApi(groupId, updatedList as OrderHistory[], 'normal');
+        } else {
+            await updateHistoryApi(groupId, updatedList as RouletteHistory[], 'roulette');
+        }
+        addToast('메뉴가 추가되었습니다.', 'success');
+    };
+
     return (
         <div className="h-full flex flex-col bg-background relative overflow-hidden">
             <Toast toasts={toasts} removeToast={removeToast} />
@@ -278,6 +313,7 @@ const OrderPage = () => {
                 onAddMode={handleHistoryAddMode}
                 onDeleteItem={handleDeleteItem}
                 onUpdateWinner={handleUpdateWinner}
+                onAddItem={handleAddItemToHistory}
             />
 
             <RouletteModal
@@ -326,8 +362,17 @@ const OrderPage = () => {
             />
 
             {editingHistoryInfo && (
-                <div className="bg-primary text-white text-center py-2 text-sm font-bold animate-pulse shadow-md relative z-20">
-                    ✨ 지난 주문 내역을 수정 중입니다 (메뉴를 터치하세요)
+                <div className="bg-primary text-white text-center py-2 text-sm font-bold shadow-md relative z-20 flex items-center justify-center">
+                    <span className="flex-1">✨ 지난 주문 내역을 수정 중입니다 (메뉴를 터치하세요)</span>
+                    <button
+                        onClick={() => {
+                            setEditingHistoryInfo(null);
+                            setIsHistoryOpen(true);
+                        }}
+                        className="mr-3 px-3 py-1 bg-white text-primary rounded-lg text-xs font-bold hover:bg-gray-100 transition-colors shrink-0"
+                    >
+                        수정 완료
+                    </button>
                 </div>
             )}
 
@@ -335,8 +380,9 @@ const OrderPage = () => {
                 isOpen={isMenuModalOpen}
                 menu={selectedMenu}
                 addonMenus={addonMenus}
-                onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); }}
+                onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); setSelectedInitialOption(undefined); }}
                 onAddToCart={handleModalAddToCart}
+                initialOption={selectedInitialOption}
             />
 
             {isSearchMode && (
@@ -381,8 +427,8 @@ const OrderPage = () => {
                     }}
                     className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform active:scale-95 
                   ${editingHistoryInfo
-                        ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
-                        : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
+                            ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
+                            : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
                 >
                     <div className="relative">
                         {editingHistoryInfo ? <Pencil size={28} /> : <ShoppingCart size={28} />}

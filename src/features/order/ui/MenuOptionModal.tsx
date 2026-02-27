@@ -13,19 +13,20 @@ interface Props {
     addonMenus: Menu[];
     onClose: () => void;
     onAddToCart: (e: React.MouseEvent, menuName: string, price: number, option: OptionType, category: string) => void;
+    initialOption?: OptionType;
 }
 
-const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart }) => {
+const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart, initialOption }) => {
     const [selectedOption, setSelectedOption] = useState<OptionType>('ICE');
     const [addonSelections, setAddonSelections] = useState<AddonSelection[]>([]);
 
     // 메뉴가 바뀔 때마다 상태 초기화
     React.useEffect(() => {
         if (menu) {
-            setSelectedOption(menu.hasOption ? 'ICE' : 'ONLY');
+            setSelectedOption(initialOption || (menu.hasOption ? 'ICE' : 'ONLY'));
             setAddonSelections([]);
         }
-    }, [menu]);
+    }, [menu, initialOption]);
 
     if (!isOpen || !menu) return null;
 
@@ -117,17 +118,18 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
 
                 {/* 스크롤 영역 */}
                 <div className="flex-1 overflow-y-auto px-6 pb-4">
-                    {/* ICE/HOT 선택 (hasOption일 때만) */}
-                    {menu.hasOption && (
+                    {/* ICE/HOT 선택 */}
+                    {(menu.hasOption || menu.defaultOption === 'ICE' || menu.defaultOption === 'HOT') && (
                         <div className="mb-5">
                             <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">온도 선택</label>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setSelectedOption('ICE')}
+                                    disabled={!menu.hasOption && menu.defaultOption === 'HOT'}
                                     className={`flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 border-2 ${selectedOption === 'ICE'
                                         ? 'bg-blue-50 text-blue-600 border-blue-400 shadow-sm'
                                         : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
-                                        }`}
+                                        } ${!menu.hasOption && menu.defaultOption === 'HOT' ? 'opacity-30 cursor-not-allowed !active:scale-100' : ''}`}
                                 >
                                     <Snowflake size={18} />
                                     <span>ICE</span>
@@ -137,10 +139,11 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                                 </button>
                                 <button
                                     onClick={() => setSelectedOption('HOT')}
+                                    disabled={!menu.hasOption && menu.defaultOption === 'ICE'}
                                     className={`flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 border-2 ${selectedOption === 'HOT'
                                         ? 'bg-red-50 text-red-600 border-red-400 shadow-sm'
                                         : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
-                                        }`}
+                                        } ${!menu.hasOption && menu.defaultOption === 'ICE' ? 'opacity-30 cursor-not-allowed !active:scale-100' : ''}`}
                                 >
                                     <Flame size={18} />
                                     <span>HOT</span>
