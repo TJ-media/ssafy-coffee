@@ -10,7 +10,7 @@ service cloud.firestore {
     // menus 컬렉션은 읽기만 허용 (메뉴 데이터 로딩용)
     match /menus/{menuId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true; // ⚠️ 임시: 스타벅스 메뉴 업로드 후 false로 되돌릴 것
     }
 
     // 그 외의 모든 경로에 대해서는 접근을 완전히 차단
