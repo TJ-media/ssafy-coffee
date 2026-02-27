@@ -1,5 +1,5 @@
 export type OptionType = 'ICE' | 'HOT' | 'ONLY';
-export type CupSize = 'Short' | 'Tall' | 'Grande' | 'Venti';
+export type CupSize = 'Short' | 'Tall' | 'Grande' | 'Venti' | '7oz' | '500ml' | 'Trenta';
 
 export interface Menu {
   id: number;
@@ -11,6 +11,7 @@ export interface Menu {
   img: string;
   hasOption: boolean;
   defaultOption?: OptionType; // 커스텀 메뉴의 기본 옵션 저장 (ICE/HOT)
+  sizes?: string[]; // 스타벅스 메뉴별 가용 사이즈 (예: ['Short', 'Tall', 'Grande', 'Venti'])
 }
 
 export interface CartItem {
