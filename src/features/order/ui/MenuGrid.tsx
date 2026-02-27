@@ -403,13 +403,15 @@ const MenuGrid: React.FC<Props> = ({
                                     </button>
                                 </>
                             ) : (
-                                <div className={`w-full py-2 rounded-xl text-xs font-bold text-center ${menu.defaultOption === 'HOT'
-                                        ? 'bg-red-50 text-red-500'
-                                        : 'bg-primary/10 text-primary'
-                                    }`}>
-                                    {menu.defaultOption === 'HOT' ? '🔥 ONLY HOT' :
-                                        menu.defaultOption === 'ICE' ? '🧊 ONLY ICE' : '선택하기'}
-                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, menu.defaultOption === 'HOT' ? 'HOT' : 'ICE'); }}
+                                    className={`w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition-colors active:scale-95 ${menu.defaultOption === 'HOT'
+                                            ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                        }`}>
+                                    {menu.defaultOption === 'HOT' ? <><Flame size={12} /> ONLY HOT</> :
+                                        menu.defaultOption === 'ICE' ? <><Snowflake size={12} /> ONLY ICE</> : '선택하기'}
+                                </button>
                             )}
                         </div>
                     </div>
