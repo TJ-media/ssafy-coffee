@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, History, Target, LogOut, Heart, ChevronLeft, ChevronRight, Settings, Search } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
+import { CAFE_LIST } from '../../../menuData';
 
 interface Props {
     groupId: string;
@@ -18,13 +19,14 @@ interface Props {
     onLogout: () => void;
     onToggleSearch: () => void;
     isSearchMode: boolean;
+    selectedCafe?: string;
 }
 
 const OrderHeader: React.FC<Props> = ({
     groupId, userName, selectedCategory, selectedSubCategory,
     onSelectCategory, onSelectSubCategory, subCategories, categories,
     onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout,
-    onToggleSearch, isSearchMode
+    onToggleSearch, isSearchMode, selectedCafe
 }) => {
     const categoryScrollRef = useRef<HTMLDivElement>(null);
     const subCategoryScrollRef = useRef<HTMLDivElement>(null);
@@ -71,7 +73,7 @@ const OrderHeader: React.FC<Props> = ({
                         {userName.slice(0, 3)}
                     </div>
                     <div className="min-w-0">
-                        <h2 className="text-lg font-bold text-text-primary">메가커피</h2>
+                        <h2 className="text-lg font-bold text-text-primary">{CAFE_LIST.find(c => c.id === selectedCafe)?.name || '카페'}</h2>
                         <p className="text-xs text-text-secondary truncate">{groupId}</p>
                     </div>
                 </div>

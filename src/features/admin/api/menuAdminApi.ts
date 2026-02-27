@@ -1,12 +1,13 @@
 /**
  * Firestore 메뉴 관리 API
- * menus/mega 문서의 items 배열과 categories 배열을 관리합니다.
+ * menus/{cafeId} 문서의 items 배열과 categories 배열을 관리합니다.
  */
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { Menu } from '../../../shared/types';
 
-const MENU_DOC_REF = doc(db, 'menus', 'mega');
+const getMenuDocRef = (cafeId: string = 'mega') => doc(db, 'menus', cafeId);
+const MENU_DOC_REF = getMenuDocRef('mega');
 
 export interface MenuDocument {
     cafeId: string;

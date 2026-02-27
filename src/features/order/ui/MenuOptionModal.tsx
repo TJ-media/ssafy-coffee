@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Menu, OptionType } from '../../../shared/types';
-import { X, Snowflake, Flame, Plus, Minus } from 'lucide-react';
+import { Menu, OptionType, CupSize } from '../../../shared/types';
+import { X, Snowflake, Flame, Plus, Minus, CupSoda } from 'lucide-react';
 
 interface AddonSelection {
     menu: Menu;
@@ -14,17 +14,39 @@ interface Props {
     onClose: () => void;
     onAddToCart: (e: React.MouseEvent, menuName: string, price: number, option: OptionType, category: string) => void;
     initialOption?: OptionType;
+    selectedCafe?: string;
 }
 
-const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart, initialOption }) => {
+// 스타벅스 컵 사이즈별 가격 차이 (Tall 기준)
+const CUP_SIZE_PRICE_DIFF: Record<CupSize, number> = {
+    Short: -800,
+    Tall: 0,
+    Grande: 600,
+    Venti: 1400,
+};
+
+const CUP_SIZE_LABELS: { size: CupSize; label: string; ml: string }[] = [
+    { size: 'Short', label: 'Short', ml: '237ml' },
+    { size: 'Tall', label: 'Tall', ml: '355ml' },
+    { size: 'Grande', label: 'Grande', ml: '473ml' },
+    { size: 'Venti', label: 'Venti', ml: '591ml' },
+];
+
+const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart, initialOption, selectedCafe }) => {
     const [selectedOption, setSelectedOption] = useState<OptionType>('ICE');
     const [addonSelections, setAddonSelections] = useState<AddonSelection[]>([]);
+    const [selectedCupSize, setSelectedCupSize] = useState<CupSize>('Tall');
+
+    const isStarbucks = selectedCafe === 'starbucks';
+    // 푸드/추가 카테고리는 컵 사이즈 선택 불가
+    const showCupSize = isStarbucks && menu !== null && menu.categoryUpper !== '푸드' && menu.categoryUpper !== '추가';
 
     // 메뉴가 바뀔 때마다 상태 초기화
     React.useEffect(() => {
         if (menu) {
             setSelectedOption(initialOption || (menu.hasOption ? 'ICE' : 'ONLY'));
             setAddonSelections([]);
+            setSelectedCupSize('Tall');
         }
     }, [menu, initialOption]);
 
@@ -35,11 +57,14 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
         ? menu.hotPrice
         : menu.price;
 
+    // 컵 사이즈 가격 차이
+    const cupSizePriceDiff = showCupSize ? CUP_SIZE_PRICE_DIFF[selectedCupSize] : 0;
+
     // 추가 옵션 총 가격
     const addonTotalPrice = addonSelections.reduce((sum, addon) => sum + (addon.menu.price * addon.quantity), 0);
 
     // 최종 가격
-    const finalPrice = basePrice + addonTotalPrice;
+    const finalPrice = basePrice + cupSizePriceDiff + addonTotalPrice;
 
     // 추가 옵션 토글
     const toggleAddon = (addonMenu: Menu) => {
@@ -71,6 +96,10 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
     const handleAdd = (e: React.MouseEvent) => {
         // 메뉴명 조합
         let finalName = menu.name;
+        // 스타벅스 컵 사이즈 표시 (Tall이 아닌 경우)
+        if (showCupSize && selectedCupSize !== 'Tall') {
+            finalName = `[${selectedCupSize}] ${finalName}`;
+        }
         addonSelections.forEach(addon => {
             const suffix = addon.quantity > 1
                 ? `${addon.menu.name}(x${addon.quantity})`
@@ -155,6 +184,38 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                         </div>
                     )}
 
+                    {/* 스타벅스 컵 사이즈 선택 */}
+                    {showCupSize && (
+                        <div className="mb-5">
+                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                                <CupSoda size={14} />
+                                컵 사이즈
+                            </label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {CUP_SIZE_LABELS.map(({ size, label, ml }) => {
+                                    const diff = CUP_SIZE_PRICE_DIFF[size];
+                                    const isSelected = selectedCupSize === size;
+                                    return (
+                                        <button
+                                            key={size}
+                                            onClick={() => setSelectedCupSize(size)}
+                                            className={`py-3 rounded-2xl font-bold text-xs flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 border-2 ${isSelected
+                                                ? 'bg-green-50 text-green-700 border-green-400 shadow-sm'
+                                                : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            <span className="font-extrabold text-sm">{label}</span>
+                                            <span className="text-[10px] opacity-60">{ml}</span>
+                                            <span className={`text-[10px] mt-0.5 ${isSelected ? 'text-green-600' : 'text-gray-400'}`}>
+                                                {diff === 0 ? '기준' : diff > 0 ? `+${diff.toLocaleString()}원` : `${diff.toLocaleString()}원`}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* 추가 옵션 */}
                     {menu.categoryUpper !== '추가' && (
                         <div>
@@ -218,13 +279,19 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
 
                 {/* 하단 고정: 가격 + 담기 버튼 */}
                 <div className="px-6 pb-6 pt-3 border-t border-gray-100 shrink-0 bg-white">
-                    {/* 가격 상세 (추가 옵션이 있을 때만) */}
-                    {addonSelections.length > 0 && (
+                    {/* 가격 상세 (추가 옵션이나 컵 사이즈 변경이 있을 때) */}
+                    {(addonSelections.length > 0 || (showCupSize && selectedCupSize !== 'Tall')) && (
                         <div className="mb-3 space-y-1">
                             <div className="flex justify-between text-sm text-gray-500">
-                                <span>{menu.name}</span>
+                                <span>{menu.name} ({showCupSize ? selectedCupSize : ''})</span>
                                 <span>{basePrice.toLocaleString()}원</span>
                             </div>
+                            {showCupSize && cupSizePriceDiff !== 0 && (
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <span>사이즈 변경 ({selectedCupSize})</span>
+                                    <span>{cupSizePriceDiff > 0 ? '+' : ''}{cupSizePriceDiff.toLocaleString()}원</span>
+                                </div>
+                            )}
                             {addonSelections.map(addon => (
                                 <div key={addon.menu.id} className="flex justify-between text-sm text-gray-500">
                                     <span>{addon.menu.name}{addon.quantity > 1 ? ` x${addon.quantity}` : ''}</span>

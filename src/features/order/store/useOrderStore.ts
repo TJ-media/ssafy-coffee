@@ -23,6 +23,7 @@ interface OrderState {
     rouletteGame: RouletteGameState | undefined;
     marbleCounts: { [userName: string]: number };
     password: string;
+    selectedCafe: string;
 
     // ─── 커스텀 메뉴 상태 ───
     allCustomMenus: { [key: string]: Menu[] };
@@ -86,6 +87,7 @@ export const useOrderStore = create<OrderState & OrderActions>((set, get) => ({
     rouletteGame: undefined,
     marbleCounts: {},
     password: '',
+    selectedCafe: 'mega',
 
     // 커스텀 메뉴
     allCustomMenus: {},
@@ -171,6 +173,7 @@ export const useOrderStore = create<OrderState & OrderActions>((set, get) => ({
                     rouletteGame: data.rouletteGame,
                     marbleCounts: data.marbleCounts || {},
                     password: data.password || '',
+                    selectedCafe: data.selectedCafe || 'mega',
                     allCustomMenus: loadedCustomMenus,
                     myCustomMenus: loadedCustomMenus[currentUserName] || [],
                     _prevCart: currentCart,

@@ -18,14 +18,17 @@ interface UseMenuDataReturn {
     error: string | null;
 }
 
-export const useMenuData = (): UseMenuDataReturn => {
+export const useMenuData = (cafeId: string = 'mega'): UseMenuDataReturn => {
     const [menus, setMenus] = useState<Menu[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const docRef = doc(db, 'menus', 'mega');
+        const docRef = doc(db, 'menus', cafeId);
+
+        setLoading(true);
+        setError(null);
 
         const unsubscribe = onSnapshot(
             docRef,
@@ -49,7 +52,7 @@ export const useMenuData = (): UseMenuDataReturn => {
         );
 
         return () => unsubscribe();
-    }, []);
+    }, [cafeId]);
 
     return { menus, categories, loading, error };
 };

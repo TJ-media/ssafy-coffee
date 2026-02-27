@@ -22,7 +22,8 @@ const OrderPage = () => {
     // 1. Firebase 실시간 구독 생명주기 연결
     useOrderInitialize();
 
-    const { menus: allMenus, categories } = useMenuData();
+    const selectedCafe = useOrderStore(state => state.selectedCafe);
+    const { menus: allMenus, categories } = useMenuData(selectedCafe);
     const navigate = useNavigate();
     const { searchQuery, setSearchQuery, isSearchMode, setIsSearchMode, searchResults, convertedQuery, clearSearch } = useMenuSearch(allMenus);
 
@@ -359,6 +360,7 @@ const OrderPage = () => {
                     }
                 }}
                 isSearchMode={isSearchMode}
+                selectedCafe={selectedCafe}
             />
 
             {editingHistoryInfo && (
@@ -383,6 +385,7 @@ const OrderPage = () => {
                 onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); setSelectedInitialOption(undefined); }}
                 onAddToCart={handleModalAddToCart}
                 initialOption={selectedInitialOption}
+                selectedCafe={selectedCafe}
             />
 
             {isSearchMode && (

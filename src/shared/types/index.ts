@@ -1,4 +1,5 @@
 export type OptionType = 'ICE' | 'HOT' | 'ONLY';
+export type CupSize = 'Short' | 'Tall' | 'Grande' | 'Venti';
 
 export interface Menu {
   id: number;
@@ -19,6 +20,7 @@ export interface CartItem {
   price: number;
   option: OptionType;
   category: string;
+  cupSize?: CupSize; // 스타벅스 컵 사이즈 (선택)
 }
 
 export interface GroupData {
