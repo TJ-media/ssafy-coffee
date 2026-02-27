@@ -15,14 +15,16 @@ import RouletteModal from '../features/roulette/ui/RouletteModal';
 import SettingsModal from '../features/order/ui/SettingsModal';
 import SearchBar from '../features/order/ui/SearchBar';
 import Toast from '../shared/ui/Toast';
-import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi } from '../features/order/api/firebaseApi';
+import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi, changeCafeApi } from '../features/order/api/firebaseApi';
 import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType } from '../shared/types';
+import { CAFE_LIST } from '../menuData';
 
 const OrderPage = () => {
     // 1. Firebase 실시간 구독 생명주기 연결
     useOrderInitialize();
 
-    const { menus: allMenus, categories } = useMenuData();
+    const selectedCafe = useOrderStore(state => state.selectedCafe);
+    const { menus: allMenus, categories } = useMenuData(selectedCafe);
     const navigate = useNavigate();
     const { searchQuery, setSearchQuery, isSearchMode, setIsSearchMode, searchResults, convertedQuery, clearSearch } = useMenuSearch(allMenus);
 
@@ -67,6 +69,11 @@ const OrderPage = () => {
     const [selectedMenu, setSelectedMenu] = useState<Menu | null>(null);
     const [selectedInitialOption, setSelectedInitialOption] = useState<OptionType | undefined>(undefined);
     const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
+
+    // 카페 변경 관련 상태
+    const [isCafeSelectOpen, setIsCafeSelectOpen] = useState(false);
+    const [pendingCafe, setPendingCafe] = useState<string | null>(null);
+    const [isCafeConfirmOpen, setIsCafeConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (selectedCategory === '메뉴 추가') {
@@ -359,6 +366,8 @@ const OrderPage = () => {
                     }
                 }}
                 isSearchMode={isSearchMode}
+                selectedCafe={selectedCafe}
+                onChangeCafe={() => setIsCafeSelectOpen(true)}
             />
 
             {editingHistoryInfo && (
@@ -383,6 +392,7 @@ const OrderPage = () => {
                 onClose={() => { setIsMenuModalOpen(false); setSelectedMenu(null); setSelectedInitialOption(undefined); }}
                 onAddToCart={handleModalAddToCart}
                 initialOption={selectedInitialOption}
+                selectedCafe={selectedCafe}
             />
 
             {isSearchMode && (
@@ -459,6 +469,99 @@ const OrderPage = () => {
                     onClose={() => setIsCartOpen(false)}
                     onEdit={() => { }}
                 />
+            )}
+
+            {/* 카페 선택 모달 */}
+            {isCafeSelectOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" onClick={() => setIsCafeSelectOpen(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-bounce-in">
+                        <h3 className="text-lg font-bold text-center mb-1">카페 선택</h3>
+                        <p className="text-xs text-gray-400 text-center mb-5">주문할 카페를 변경합니다</p>
+                        <div className="space-y-2">
+                            {CAFE_LIST.map(cafe => (
+                                <button
+                                    key={cafe.id}
+                                    onClick={() => {
+                                        if (cafe.id === selectedCafe) {
+                                            setIsCafeSelectOpen(false);
+                                            return;
+                                        }
+                                        if (cart.length > 0) {
+                                            setPendingCafe(cafe.id);
+                                            setIsCafeSelectOpen(false);
+                                            setIsCafeConfirmOpen(true);
+                                        } else {
+                                            if (groupId) changeCafeApi(groupId, cafe.id);
+                                            setIsCafeSelectOpen(false);
+                                            setSelectedCategory('커피');
+                                            addToast(`${cafe.name}(으)로 변경되었습니다!`, 'success');
+                                        }
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all active:scale-[0.98] border-2 ${cafe.id === selectedCafe
+                                            ? 'bg-primary/10 border-primary text-primary font-bold'
+                                            : 'bg-gray-50 border-transparent hover:bg-gray-100 text-gray-700'
+                                        }`}
+                                >
+                                    <span className="text-2xl">{cafe.img}</span>
+                                    <span className="font-bold">{cafe.name}</span>
+                                    {cafe.id === selectedCafe && (
+                                        <span className="ml-auto text-xs bg-primary text-white px-2 py-0.5 rounded-full">현재</span>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setIsCafeSelectOpen(false)}
+                            className="w-full mt-4 py-3 rounded-2xl bg-gray-100 text-gray-500 font-bold text-sm hover:bg-gray-200 transition-colors active:scale-[0.98]"
+                        >
+                            취소
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 카페 변경 확인 모달 */}
+            {isCafeConfirmOpen && pendingCafe && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6 animate-bounce-in">
+                        <div className="text-center">
+                            <div className="text-4xl mb-3">⚠️</div>
+                            <h3 className="text-lg font-bold mb-2">카페를 변경할까요?</h3>
+                            <p className="text-sm text-gray-500 mb-5">
+                                카페를 변경하면 현재 장바구니에 담긴<br />
+                                <strong className="text-danger">{cart.length}개의 메뉴가 사라져요.</strong>
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    setIsCafeConfirmOpen(false);
+                                    setPendingCafe(null);
+                                }}
+                                className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition-colors active:scale-[0.98]"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (groupId && pendingCafe) {
+                                        changeCafeApi(groupId, pendingCafe);
+                                        const cafeName = CAFE_LIST.find(c => c.id === pendingCafe)?.name || '카페';
+                                        addToast(`${cafeName}(으)로 변경되었습니다!`, 'success');
+                                        setSelectedCategory('커피');
+                                    }
+                                    setIsCafeConfirmOpen(false);
+                                    setPendingCafe(null);
+                                }}
+                                className="flex-1 py-3 rounded-2xl bg-danger text-white font-bold text-sm hover:bg-red-600 transition-colors active:scale-[0.98]"
+                            >
+                                변경하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

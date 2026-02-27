@@ -89,3 +89,12 @@ export const getInviteTokenApi = async (tokenId: string) => {
     }
     return null;
 };
+
+// 👇 추가: 카페 변경 API (장바구니 초기화 포함)
+export const changeCafeApi = async (groupId: string, newCafeId: string) => {
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+        selectedCafe: newCafeId,
+        cart: [],
+    });
+};
