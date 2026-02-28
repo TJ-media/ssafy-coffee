@@ -7,10 +7,20 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // menus 컬렉션은 읽기만 허용 (메뉴 데이터 로딩용)
+    // menus 컬렉션은 읽기/쓰기 허용 (메뉴 데이터 로딩 및 관리용)
     match /menus/{menuId} {
       allow read: if true;
-      allow write: if true; // ⚠️ 임시: 스타벅스 메뉴 업로드 후 false로 되돌릴 것
+      allow write: if true;
+    }
+
+    // system 컬렉션 (관리자 비밀번호, 공지사항 등)
+    match /system/{docId} {
+      allow read, write: if true;
+    }
+
+    // menuRequests 컬렉션 (메뉴 신청)
+    match /menuRequests/{requestId} {
+      allow read, write: if true;
     }
 
     // 그 외의 모든 경로에 대해서는 접근을 완전히 차단
