@@ -61,7 +61,7 @@ function App() {
               )}
 
               <div className={`w-full bg-surface overflow-hidden relative transition-all duration-500 ease-in-out ${isDesktopView
-                ? 'rounded-3xl shadow-xl max-h-[85vh] overflow-y-auto custom-scrollbar'
+                ? 'rounded-3xl shadow-xl h-[85vh]'
                 : 'shadow-toss rounded-toss h-[800px] max-h-[90vh]'
                 }`}>
                 <Routes>
