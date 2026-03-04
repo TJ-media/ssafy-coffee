@@ -60,8 +60,8 @@ const OrderPage = () => {
     const deleteCustomMenuHandler = useOrderStore(state => state.deleteCustomMenuHandler);
 
     // 3. 페이지 내부 컴포넌트 상태
-    const [selectedCategory, setSelectedCategory] = useState('커피');
-    const [selectedSubCategory, setSelectedSubCategory] = useState('전체');
+    const [selectedCategory, setSelectedCategory] = useState('메뉴 추가');
+    const [selectedSubCategory, setSelectedSubCategory] = useState('직접 입력');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const cartFabRef = useRef<HTMLButtonElement>(null);
     const cartSheetRef = useRef<HTMLDivElement>(null);

@@ -76,9 +76,9 @@ const MenuGrid: React.FC<Props> = ({
                         <h3 className="text-lg font-bold text-gray-800">메뉴 직접 담기</h3>
                     </div>
                     <p className="text-xs text-gray-500 mb-6 ml-8">
-                        메뉴판에 없는 메뉴를 직접 입력해주세요.<br />
-                        입력한 메뉴는 '최근 기록' 탭에 저장되어<br />
-                        언제든 다시 불러올 수 있습니다.
+                        메뉴판에 없는 메뉴나 나만의 커스텀 메뉴를 직접 추가해 보세요.<br />
+                        입력 메뉴는 '최근 기록'에 저장되어 언제든 불러올 수 있습니다.<br />
+                        메뉴판에 없는 구성도 이곳에서 자유롭게 담아 보세요!
                     </p>
 
                     <div className="w-full space-y-4 mb-8">
@@ -362,6 +362,18 @@ const MenuGrid: React.FC<Props> = ({
     }
 
     // 3. 일반 메뉴 그리드 
+    const filteredMenus = currentMenus.filter(m => selectedCategory === '즐겨찾기' || selectedSubCategory === '전체' || m.categoryLower === selectedSubCategory);
+
+    if (filteredMenus.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                <Coffee size={48} className="mb-4 opacity-30" />
+                <p className="font-bold text-gray-500 mb-1">등록된 메뉴가 없어요</p>
+                <p className="text-sm text-gray-400">관리자가 메뉴를 등록하면 여기에 표시됩니다.</p>
+            </div>
+        );
+    }
+
     return (
         <div className="grid grid-cols-2 gap-4 pb-32">
             {currentMenus
