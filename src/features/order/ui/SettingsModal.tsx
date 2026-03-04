@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 import { RouletteHistory, GroupData } from '../../../shared/types';
+import { CAFE_LIST } from '../../../menuData';
 
 interface Props {
     isOpen: boolean;
@@ -24,6 +25,7 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
     const [pendingUsers, setPendingUsers] = useState<string[]>([]);
     const [approvedUsers, setApprovedUsers] = useState<string[]>([]);
     const [rouletteHistory, setRouletteHistory] = useState<RouletteHistory[]>([]);
+    const [selectedCafe, setSelectedCafe] = useState<string>('mega');
 
     const [activeTab, setActiveTab] = useState<'approval' | 'marble' | 'history' | 'settings'>('approval');
 
@@ -78,6 +80,7 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
                 setPendingUsers(data.pendingUsers || []);
                 setApprovedUsers(data.approvedUsers || []);
                 setRouletteHistory(data.rouletteHistory || []);
+                setSelectedCafe(data.selectedCafe || 'mega');
             }
         });
         return () => unsub();
@@ -218,6 +221,7 @@ const SettingsModal = ({ isOpen, onClose, groupId }: Props) => {
             orderItems,
             totalPrice,
             paid: existingRecord?.paid ?? true,
+            cafeName: existingRecord?.cafeName || CAFE_LIST.find(c => c.id === selectedCafe)?.name,
         };
 
         try {

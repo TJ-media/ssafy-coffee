@@ -69,6 +69,7 @@ export interface OrderHistory {
   items: HistoryItem[];
   participants: string[];
   winner?: string | null;
+  cafeName?: string;
 }
 
 export interface ToastMessage {
@@ -113,6 +114,7 @@ export interface RouletteHistory {
   orderItems: HistoryItem[];
   totalPrice: number;
   paid?: boolean;
+  cafeName?: string;
 }
 
 export interface MenuRequest {

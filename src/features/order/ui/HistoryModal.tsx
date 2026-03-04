@@ -251,9 +251,16 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
                       <div key={h.id} className={`border rounded-2xl p-4 bg-white shadow-sm transition-all duration-300 ${isEditing ? 'border-primary ring-1 ring-primary/20 shadow-lg scale-[1.02]' : 'border-gray-200'}`}>
                         <div className="flex justify-between items-center mb-4 pb-3 border-b border-dashed">
                           <div>
-                            <span className={`text-sm font-bold px-2.5 py-1 rounded-full mb-2 inline-block ${isRoulette ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
-                              {isRoulette ? '🎲 룰렛 게임' : '☕ 일반 주문'}
-                            </span>
+                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                              <span className={`text-sm font-bold px-2.5 py-1 rounded-full inline-block ${isRoulette ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
+                                {isRoulette ? '🎲 룰렛 게임' : '☕ 일반 주문'}
+                              </span>
+                              {(h as any).cafeName && (
+                                <span className="text-xs font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-600 inline-block">
+                                  {(h as any).cafeName}
+                                </span>
+                              )}
+                            </div>
                             <div className="text-xs text-text-secondary">{dayjs(dateObj).format('YYYY.MM.DD HH:mm')}</div>
                           </div>
                           <div className="flex items-center gap-2">
