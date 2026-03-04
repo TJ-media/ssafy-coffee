@@ -497,7 +497,7 @@ const HistoryModal = ({ isOpen, onClose, history, rouletteHistory, userName, onA
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
                     <h3 className="font-bold text-green-800 mb-3 text-sm">🧮 본전 계산기</h3>
                     <div className="flex gap-2 mb-3">
-                      <input type="number" value={coffeePrice} onChange={(e) => setCoffeePrice(e.target.value)} placeholder="커피 1잔 가격" className="flex-1 px-3 py-2 rounded-lg border border-green-200 text-sm focus:border-green-500 focus:outline-none" />
+                      <input type="number" step={500} min={0} value={coffeePrice} onChange={(e) => setCoffeePrice(e.target.value)} placeholder="커피 1잔 가격" className="flex-1 px-3 py-2 rounded-lg border border-green-200 text-sm focus:border-green-500 focus:outline-none" />
                       <span className="flex items-center text-sm text-green-600">원</span>
                     </div>
                     {sortedStats.length > 0 && coffeePrice && (

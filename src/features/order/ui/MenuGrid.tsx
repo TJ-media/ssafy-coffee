@@ -129,6 +129,8 @@ const MenuGrid: React.FC<Props> = ({
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold group-focus-within:text-primary transition-colors">₩</span>
                                 <input
                                     type="number"
+                                    step={500}
+                                    min={0}
                                     value={customPrice}
                                     onChange={(e) => setCustomPrice(e.target.value)}
                                     placeholder="가격 입력"
@@ -293,6 +295,8 @@ const MenuGrid: React.FC<Props> = ({
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold group-focus-within:text-purple-500 transition-colors">₩</span>
                                 <input
                                     type="number"
+                                    step={500}
+                                    min={0}
                                     value={requestPrice}
                                     onChange={(e) => setRequestPrice(e.target.value)}
                                     placeholder="가격 입력"
@@ -406,8 +410,8 @@ const MenuGrid: React.FC<Props> = ({
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, menu.defaultOption === 'HOT' ? 'HOT' : 'ICE'); }}
                                     className={`w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition-colors active:scale-95 ${menu.defaultOption === 'HOT'
-                                            ? 'bg-red-50 text-red-500 hover:bg-red-100'
-                                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                        ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                                         }`}>
                                     {menu.defaultOption === 'HOT' ? <><Flame size={12} /> ONLY HOT</> :
                                         menu.defaultOption === 'ICE' ? <><Snowflake size={12} /> ONLY ICE</> : '선택하기'}
