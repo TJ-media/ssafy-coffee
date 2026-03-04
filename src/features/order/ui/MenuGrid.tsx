@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Menu, OptionType } from '../../../shared/types';
 import { Heart, Plus, Coffee, History, Trash2, Snowflake, Flame, Send, MessageSquarePlus, Loader2, CheckCircle } from 'lucide-react';
 import { submitMenuRequest } from '../api/menuRequestApi';
+import { useLayoutStore } from '../../../shared/store/useLayoutStore';
 
 interface Props {
     selectedCategory: string;
@@ -24,6 +25,7 @@ const MenuGrid: React.FC<Props> = ({
     menus, customMenus, onSaveCustomMenu, onDeleteCustomMenu,
     groupId, userName
 }) => {
+    const viewMode = useLayoutStore(state => state.viewMode);
     const [customName, setCustomName] = useState('');
     const [customPrice, setCustomPrice] = useState('');
     const [customOption, setCustomOption] = useState<OptionType>('ICE');
@@ -76,9 +78,9 @@ const MenuGrid: React.FC<Props> = ({
                         <h3 className="text-lg font-bold text-gray-800">메뉴 직접 담기</h3>
                     </div>
                     <p className="text-xs text-gray-500 mb-6 ml-8">
-                        메뉴판에 없는 메뉴를 직접 입력해주세요.<br />
-                        입력한 메뉴는 '최근 기록' 탭에 저장되어<br />
-                        언제든 다시 불러올 수 있습니다.
+                        메뉴판에 없는 메뉴나 나만의 커스텀 메뉴를 직접 추가해 보세요.<br />
+                        입력 메뉴는 '최근 기록'에 저장되어 언제든 불러올 수 있습니다.<br />
+                        메뉴판에 없는 구성도 이곳에서 자유롭게 담아 보세요!
                     </p>
 
                     <div className="w-full space-y-4 mb-8">
@@ -129,6 +131,8 @@ const MenuGrid: React.FC<Props> = ({
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold group-focus-within:text-primary transition-colors">₩</span>
                                 <input
                                     type="number"
+                                    step={500}
+                                    min={0}
                                     value={customPrice}
                                     onChange={(e) => setCustomPrice(e.target.value)}
                                     placeholder="가격 입력"
@@ -293,6 +297,8 @@ const MenuGrid: React.FC<Props> = ({
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold group-focus-within:text-purple-500 transition-colors">₩</span>
                                 <input
                                     type="number"
+                                    step={500}
+                                    min={0}
                                     value={requestPrice}
                                     onChange={(e) => setRequestPrice(e.target.value)}
                                     placeholder="가격 입력"
@@ -358,64 +364,74 @@ const MenuGrid: React.FC<Props> = ({
     }
 
     // 3. 일반 메뉴 그리드 
+    const filteredMenus = currentMenus.filter(m => selectedCategory === '즐겨찾기' || selectedSubCategory === '전체' || m.categoryLower === selectedSubCategory);
+
+    if (filteredMenus.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                <Coffee size={48} className="mb-4 opacity-30" />
+                <p className="font-bold text-gray-500 mb-1">등록된 메뉴가 없어요</p>
+                <p className="text-sm text-gray-400">관리자가 메뉴를 등록하면 여기에 표시됩니다.</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="grid grid-cols-2 gap-4 pb-32">
-            {currentMenus
-                .filter(m => selectedCategory === '즐겨찾기' || selectedSubCategory === '전체' || m.categoryLower === selectedSubCategory)
-                .map(menu => (
-                    <div
-                        key={menu.id}
-                        onClick={() => onMenuSelect(menu)}
-                        className="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center transition hover:-translate-y-1 relative group cursor-pointer"
-                    >
-                        <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(menu); }} className="absolute top-3 right-3 p-1 hover:scale-110 transition z-10">
-                            <Heart size={20} className={`${favoriteMenuIds.includes(menu.id) ? 'text-red-500 fill-red-500' : 'text-gray-300'} transition-colors`} />
-                        </button>
+        <div className={`grid gap-4 pb-32 ${viewMode === 'desktop' ? 'grid-cols-3 lg:grid-cols-4' : 'grid-cols-2'}`}>
+            {filteredMenus.map(menu => (
+                <div
+                    key={menu.id}
+                    onClick={() => onMenuSelect(menu)}
+                    className="bg-white p-4 rounded-2xl shadow-sm flex flex-col items-center transition hover:-translate-y-1 relative group cursor-pointer"
+                >
+                    <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(menu); }} className="absolute top-3 right-3 p-1 hover:scale-110 transition z-10">
+                        <Heart size={20} className={`${favoriteMenuIds.includes(menu.id) ? 'text-red-500 fill-red-500' : 'text-gray-300'} transition-colors`} />
+                    </button>
 
-                        <div className="text-5xl mb-3">{menu.img}</div>
+                    <div className="text-5xl mb-3">{menu.img}</div>
 
-                        {selectedSubCategory === '전체' && (
-                            <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full mb-1 font-bold">{menu.categoryLower}</span>
+                    {selectedSubCategory === '전체' && (
+                        <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full mb-1 font-bold">{menu.categoryLower}</span>
+                    )}
+
+                    <h3 className="font-bold text-gray-800 text-center break-keep mb-1 leading-tight">{menu.name}</h3>
+                    <p className="text-sm text-blue-500 font-bold mb-3">
+                        {menu.price.toLocaleString()}원
+                        {menu.hotPrice !== undefined && menu.hotPrice !== menu.price && (
+                            <span className="text-[10px] text-gray-400 ml-1">~</span>
                         )}
+                    </p>
 
-                        <h3 className="font-bold text-gray-800 text-center break-keep mb-1 leading-tight">{menu.name}</h3>
-                        <p className="text-sm text-blue-500 font-bold mb-3">
-                            {menu.price.toLocaleString()}원
-                            {menu.hotPrice !== undefined && menu.hotPrice !== menu.price && (
-                                <span className="text-[10px] text-gray-400 ml-1">~</span>
-                            )}
-                        </p>
-
-                        <div className="flex w-full gap-2 mt-auto">
-                            {menu.hasOption ? (
-                                <>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, 'ICE'); }}
-                                        className="flex-1 py-2 rounded-xl text-xs font-bold text-center bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors active:scale-95 flex items-center justify-center gap-1"
-                                    >
-                                        <Snowflake size={12} /> ICE
-                                    </button>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, 'HOT'); }}
-                                        className="flex-1 py-2 rounded-xl text-xs font-bold text-center bg-red-50 text-red-500 hover:bg-red-100 transition-colors active:scale-95 flex items-center justify-center gap-1"
-                                    >
-                                        <Flame size={12} /> HOT
-                                    </button>
-                                </>
-                            ) : (
+                    <div className="flex w-full gap-2 mt-auto">
+                        {menu.hasOption ? (
+                            <>
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, menu.defaultOption === 'HOT' ? 'HOT' : 'ICE'); }}
-                                    className={`w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition-colors active:scale-95 ${menu.defaultOption === 'HOT'
-                                            ? 'bg-red-50 text-red-500 hover:bg-red-100'
-                                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                        }`}>
-                                    {menu.defaultOption === 'HOT' ? <><Flame size={12} /> ONLY HOT</> :
-                                        menu.defaultOption === 'ICE' ? <><Snowflake size={12} /> ONLY ICE</> : '선택하기'}
+                                    onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, 'ICE'); }}
+                                    className="flex-1 py-2 rounded-xl text-xs font-bold text-center bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors active:scale-95 flex items-center justify-center gap-1"
+                                >
+                                    <Snowflake size={12} /> ICE
                                 </button>
-                            )}
-                        </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, 'HOT'); }}
+                                    className="flex-1 py-2 rounded-xl text-xs font-bold text-center bg-red-50 text-red-500 hover:bg-red-100 transition-colors active:scale-95 flex items-center justify-center gap-1"
+                                >
+                                    <Flame size={12} /> HOT
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onMenuSelect(menu, menu.defaultOption === 'HOT' ? 'HOT' : 'ICE'); }}
+                                className={`w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition-colors active:scale-95 ${menu.defaultOption === 'HOT'
+                                    ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                    }`}>
+                                {menu.defaultOption === 'HOT' ? <><Flame size={12} /> ONLY HOT</> :
+                                    menu.defaultOption === 'ICE' ? <><Snowflake size={12} /> ONLY ICE</> : '선택하기'}
+                            </button>
+                        )}
                     </div>
-                ))}
+                </div>
+            ))}
         </div>
     );
 };

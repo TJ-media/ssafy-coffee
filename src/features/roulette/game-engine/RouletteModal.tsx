@@ -6,6 +6,7 @@ import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../../firebase.ts';
 import { getAvatarColor, getTextContrastColor, getNextBusinessDay } from '../../../shared/utils';
 import RouletteResult from '../ui/RouletteResult.tsx';
+import { CAFE_LIST } from '../../../menuData';
 
 interface RouletteModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface RouletteModalProps {
   gameState: RouletteGameState | undefined;
   cart?: CartItem[];
   marbleCounts?: { [userName: string]: number };
+  selectedCafe?: string;
 }
 
 const groupCartItems = (cart: CartItem[]): GroupedCartItem[] => {
@@ -56,7 +58,8 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
   groupId,
   gameState,
   cart = [],
-  marbleCounts = {}
+  marbleCounts = {},
+  selectedCafe
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rouletteInstance = useRef<Roulette | null>(null);
@@ -149,6 +152,7 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
       participants: participants,
       orderItems: cartToHistoryItems(cachedCart),
       totalPrice: cachedCart.reduce((sum, item) => sum + item.price, 0),
+      cafeName: CAFE_LIST.find(c => c.id === selectedCafe)?.name,
     };
     const newMarbleCounts = { ...marbleCounts };
     participants.forEach(name => {
