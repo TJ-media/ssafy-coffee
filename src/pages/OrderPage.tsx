@@ -351,10 +351,27 @@ const OrderPage = () => {
                 onSelectCategory={setSelectedCategory}
                 onSelectSubCategory={setSelectedSubCategory}
                 onCopyLink={async () => {
-                    const token = await createInviteTokenApi(groupId || '', password);
-                    const inviteUrl = `${window.location.origin}/?invite=${token}`;
-                    navigator.clipboard.writeText(inviteUrl);
-                    addToast('초대 링크가 복사되었습니다!', 'success');
+                    try {
+                        const token = await createInviteTokenApi(groupId || '', password);
+                        const inviteUrl = `${window.location.origin}/?invite=${token}`;
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(inviteUrl);
+                        } else {
+                            // 폴백: textarea를 이용한 복사
+                            const textarea = document.createElement('textarea');
+                            textarea.value = inviteUrl;
+                            textarea.style.position = 'fixed';
+                            textarea.style.left = '-9999px';
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textarea);
+                        }
+                        addToast('초대 링크가 복사되었습니다!', 'success');
+                    } catch (err) {
+                        console.error('링크 복사 실패:', err);
+                        addToast('링크 복사에 실패했습니다.', 'warning');
+                    }
                 }}
                 onOpenHistory={() => setIsHistoryOpen(true)}
                 onOpenPinball={handleStartRoulette}
@@ -411,7 +428,7 @@ const OrderPage = () => {
             )}
 
             {!isSearchMode && (
-                <div className="flex-1 overflow-y-auto p-4 pb-32 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 pb-16 custom-scrollbar">
                     <MenuGrid
                         selectedCategory={selectedCategory}
                         selectedSubCategory={selectedSubCategory}

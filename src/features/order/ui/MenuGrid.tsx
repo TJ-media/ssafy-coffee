@@ -72,18 +72,18 @@ const MenuGrid: React.FC<Props> = ({
             };
 
             return (
-                <div className="flex flex-col p-6 bg-white rounded-2xl shadow-sm mx-1 min-h-[460px]">
-                    <div className="flex items-center gap-2 mb-2">
+                <div className={`flex flex-col p-6 bg-white rounded-2xl shadow-sm mx-1 min-h-[460px] ${viewMode === 'desktop' ? 'p-8' : ''}`}>
+                    <div className={`flex items-center gap-2 ${viewMode === 'desktop' ? 'mb-4' : 'mb-2'}`}>
                         <Plus size={24} className="text-blue-500" />
                         <h3 className="text-lg font-bold text-gray-800">메뉴 직접 담기</h3>
                     </div>
-                    <p className="text-xs text-gray-500 mb-6 ml-8">
-                        메뉴판에 없는 메뉴나 나만의 커스텀 메뉴를 직접 추가해 보세요.<br />
-                        입력 메뉴는 '최근 기록'에 저장되어 언제든 불러올 수 있습니다.<br />
-                        메뉴판에 없는 구성도 이곳에서 자유롭게 담아 보세요!
+                    <p className={`text-xs text-gray-500 ml-8 ${viewMode === 'desktop' ? 'mb-8' : 'mb-6'}`}>
+                        찾으시는 메뉴가 없나요?<br />
+                        이곳에서 나만의 메뉴를 직접 추가해 보세요.<br />
+                        입력한 메뉴는 '최근 기록'에서 언제든 불러올 수 있습니다.
                     </p>
 
-                    <div className="w-full space-y-4 mb-8">
+                    <div className={`w-full mb-8 ${viewMode === 'desktop' ? 'space-y-6' : 'space-y-4'}`}>
                         {/* 메뉴 이름 입력 */}
                         <div>
                             <label className="block text-xs font-bold text-gray-600 mb-1 ml-1">메뉴 이름</label>
@@ -264,17 +264,17 @@ const MenuGrid: React.FC<Props> = ({
             };
 
             return (
-                <div className="flex flex-col p-6 bg-white rounded-2xl shadow-sm mx-1 min-h-[460px]">
-                    <div className="flex items-center gap-2 mb-2">
+                <div className={`flex flex-col p-6 bg-white rounded-2xl shadow-sm mx-1 min-h-[460px] ${viewMode === 'desktop' ? 'p-8' : ''}`}>
+                    <div className={`flex items-center gap-2 ${viewMode === 'desktop' ? 'mb-4' : 'mb-2'}`}>
                         <MessageSquarePlus size={24} className="text-purple-500" />
                         <h3 className="text-lg font-bold text-gray-800">메뉴 신청</h3>
                     </div>
-                    <p className="text-xs text-gray-500 mb-6 ml-8">
+                    <p className={`text-xs text-gray-500 ml-8 ${viewMode === 'desktop' ? 'mb-8' : 'mb-6'}`}>
                         메뉴판에 없는 메뉴를 관리자에게 신청해주세요.<br />
                         관리자가 확인 후 메뉴에 추가해드립니다.
                     </p>
 
-                    <div className="w-full space-y-4 mb-8">
+                    <div className={`w-full mb-8 ${viewMode === 'desktop' ? 'space-y-6' : 'space-y-4'}`}>
                         {/* 메뉴 이름 */}
                         <div>
                             <label className="block text-xs font-bold text-gray-600 mb-1 ml-1">메뉴 이름 *</label>
@@ -377,7 +377,7 @@ const MenuGrid: React.FC<Props> = ({
     }
 
     return (
-        <div className={`grid gap-4 pb-32 ${viewMode === 'desktop' ? 'grid-cols-3 lg:grid-cols-4' : 'grid-cols-2'}`}>
+        <div className={`grid gap-4 pb-16 ${viewMode === 'desktop' ? 'grid-cols-3 lg:grid-cols-4' : 'grid-cols-2'}`}>
             {filteredMenus.map(menu => (
                 <div
                     key={menu.id}
