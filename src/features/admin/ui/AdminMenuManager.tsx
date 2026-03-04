@@ -729,6 +729,8 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                                     <label className="block text-xs font-bold text-text-secondary mb-2 uppercase tracking-wider">가격 (원) *</label>
                                     <input
                                         type="number"
+                                        step={500}
+                                        min={0}
                                         value={formData.price}
                                         onChange={e => setFormData(prev => ({ ...prev, price: e.target.value }))}
                                         placeholder="2000"
@@ -739,6 +741,8 @@ const AdminMenuManager: React.FC<Props> = ({ addToast }) => {
                                     <label className="block text-xs font-bold text-text-secondary mb-2 uppercase tracking-wider">HOT 가격 (선택)</label>
                                     <input
                                         type="number"
+                                        step={500}
+                                        min={0}
                                         value={formData.hotPrice}
                                         onChange={e => setFormData(prev => ({ ...prev, hotPrice: e.target.value }))}
                                         placeholder="비워두면 동일"
