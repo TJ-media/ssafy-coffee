@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Menu, OptionType, CupSize } from '../../../shared/types';
-import { X, Snowflake, Flame, Plus, Minus, CupSoda, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Snowflake, Flame, Plus, Minus, CupSoda, ChevronDown, ChevronRight, Store, MapPin } from 'lucide-react';
 
 interface AddonSelection {
     menu: Menu;
@@ -38,20 +38,24 @@ const CUP_SIZE_ML: Record<string, string> = {
     Trenta: '887ml',
 };
 
+
+
 const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, onAddToCart, initialOption, selectedCafe }) => {
     const [selectedOption, setSelectedOption] = useState<OptionType>('ICE');
     const [addonSelections, setAddonSelections] = useState<AddonSelection[]>([]);
     const [selectedCupSize, setSelectedCupSize] = useState<CupSize>('Tall');
     const [openAddonGroups, setOpenAddonGroups] = useState<Set<string>>(new Set());
+    const [isTakeout, setIsTakeout] = useState(true);
 
     const isStarbucks = selectedCafe === 'starbucks';
+    const isBanapresso = selectedCafe === 'banapresso';
     // 메뉴에 sizes가 있으면 컵 사이즈 표시
     const availableSizes = (isStarbucks && menu !== null && menu.sizes && menu.sizes.length >= 1) ? menu.sizes : null;
     const showCupSize = availableSizes !== null;
 
-    // 스타벅스 추가 옵션 그룹화
+    // 추가 옵션 그룹화 (스타벅스 & 바나프레소)
     const addonGroups = useMemo(() => {
-        if (!isStarbucks) return null;
+        if (!isStarbucks && !isBanapresso) return null;
         const groups: { groupName: string; items: Menu[] }[] = [];
         const groupMap = new Map<string, Menu[]>();
         addonMenus.forEach(addon => {
@@ -61,7 +65,7 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
         });
         groupMap.forEach((items, groupName) => groups.push({ groupName, items }));
         return groups;
-    }, [addonMenus, isStarbucks]);
+    }, [addonMenus, isStarbucks, isBanapresso]);
 
     // 메뉴가 바뀔 때마다 상태 초기화
     React.useEffect(() => {
@@ -69,6 +73,7 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
             setSelectedOption(initialOption || (menu.hasOption ? (menu.defaultOption || 'ICE') : (menu.defaultOption || 'ONLY')));
             setAddonSelections([]);
             setOpenAddonGroups(new Set());
+            setIsTakeout(true);
             // Tall이 있으면 Tall, 없으면 첫 번째 사이즈
             const sizes = menu.sizes || [];
             const defaultSize = sizes.includes('Tall') ? 'Tall' : (sizes[0] as CupSize || 'Tall');
@@ -78,10 +83,24 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
 
     if (!isOpen || !menu) return null;
 
+    // 바나프레소 테이크아웃 가격 차이 여부
+    const hasTakeoutOption = isBanapresso && menu.takeoutPrice !== undefined && menu.takeoutPrice !== menu.price;
+
     // 현재 선택된 옵션에 따른 기본 가격 계산
-    const basePrice = selectedOption === 'HOT' && menu.hotPrice !== undefined
-        ? menu.hotPrice
-        : menu.price;
+    const basePrice = (() => {
+        if (isTakeout && hasTakeoutOption) {
+            // 테이크아웃 가격
+            if (selectedOption === 'HOT' && menu.takeoutHotPrice !== undefined) {
+                return menu.takeoutHotPrice;
+            }
+            return menu.takeoutPrice!;
+        }
+        // 매장 가격
+        if (selectedOption === 'HOT' && menu.hotPrice !== undefined) {
+            return menu.hotPrice;
+        }
+        return menu.price;
+    })();
 
     // 컵 사이즈 가격 차이
     const cupSizePriceDiff = showCupSize ? (CUP_SIZE_PRICE_DIFF[selectedCupSize] ?? 0) : 0;
@@ -165,7 +184,7 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                         <div className="text-4xl">{menu.img}</div>
                         <div>
                             <h3 className="text-lg font-bold text-gray-800">{menu.name}</h3>
-                            <p className="text-sm text-gray-500">{menu.categoryUpper} · {menu.categoryLower}</p>
+                            <p className="text-sm text-gray-500">{menu.categoryUpper}{menu.categoryLower && menu.categoryUpper !== '추가' ? ` · ${menu.categoryLower}` : ''}</p>
                         </div>
                     </div>
                     <button
@@ -204,6 +223,35 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                                 >
                                     <Flame size={18} />
                                     <span>HOT</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 바나프레소 매장/테이크아웃 선택 */}
+                    {hasTakeoutOption && (
+                        <div className="mb-5">
+                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">이용 방식</label>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setIsTakeout(true)}
+                                    className={`flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 border-2 ${isTakeout
+                                        ? 'bg-green-50 text-green-700 border-green-400 shadow-sm'
+                                        : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
+                                        }`}
+                                >
+                                    <MapPin size={18} />
+                                    <span>테이크아웃</span>
+                                </button>
+                                <button
+                                    onClick={() => setIsTakeout(false)}
+                                    className={`flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 border-2 ${!isTakeout
+                                        ? 'bg-amber-50 text-amber-700 border-amber-400 shadow-sm'
+                                        : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
+                                        }`}
+                                >
+                                    <Store size={18} />
+                                    <span>매장</span>
                                 </button>
                             </div>
                         </div>
@@ -403,62 +451,118 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                                         );
                                     })}
                                 </div>
-                            ) : (
-                                /* 기타 카페: 기존 플랫 리스트 */
-                                <div className="space-y-2">
-                                    {addonMenus.map(addon => {
-                                        const selected = addonSelections.find(a => a.menu.id === addon.id);
-                                        return (
-                                            <div
-                                                key={addon.id}
-                                                className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${selected
-                                                    ? 'border-primary bg-blue-50/50'
-                                                    : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-                                                    }`}
-                                                onClick={() => toggleAddon(addon)}
-                                            >
-                                                <div className="flex items-center gap-2.5">
-                                                    <span className="text-lg">{addon.img}</span>
-                                                    <span className={`text-sm font-bold ${selected ? 'text-gray-800' : 'text-gray-600'}`}>
-                                                        {addon.name}
-                                                    </span>
+                            ) : isBanapresso && addonGroups ? (() => {
+                                /* 바나프레소: 선택된 온도에 따라 optionsIce/optionsHot 기반 필터링 */
+                                const currentOptions = selectedOption === 'HOT'
+                                    ? (menu.optionsHot || [])
+                                    : (menu.optionsIce || []);
+                                if (currentOptions.length === 0) return null;
+                                const optionSet = new Set(currentOptions);
+                                const filteredGroups = addonGroups
+                                    .filter(({ groupName }) => optionSet.has(groupName))
+                                    .map(({ groupName, items }) => ({ groupName, items }));
+                                if (filteredGroups.length === 0) return null;
+                                return (
+                                    <div className="space-y-3">
+                                        {filteredGroups.map(({ groupName, items }) => {
+                                            const selectedInGroup = items.filter(item => addonSelections.find(a => a.menu.id === item.id));
+                                            return (
+                                                <div key={groupName} className="rounded-xl border border-gray-200 overflow-hidden">
+                                                    <div className="px-3 py-2 bg-gray-50 flex items-center justify-between">
+                                                        <span className="text-xs font-bold text-gray-500">{groupName}</span>
+                                                        {selectedInGroup.length > 0 && (
+                                                            <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full font-bold">
+                                                                {selectedInGroup.length}개
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="p-2 flex flex-wrap gap-1.5">
+                                                        {items.map(addon => {
+                                                            const selected = addonSelections.find(a => a.menu.id === addon.id);
+                                                            return (
+                                                                <button
+                                                                    key={addon.id}
+                                                                    onClick={() => toggleAddon(addon)}
+                                                                    className={`px-3 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 border ${selected
+                                                                        ? 'bg-primary/10 text-primary border-primary'
+                                                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                                                                        }`}
+                                                                >
+                                                                    {addon.name}
+                                                                    {addon.price !== 0 && (
+                                                                        <span className="ml-1 opacity-70">
+                                                                            {addon.price < 0 ? addon.price.toLocaleString() : `+${addon.price.toLocaleString()}`}원
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-sm font-bold ${selected ? 'text-primary' : 'text-gray-400'}`}>
-                                                        +{addon.price.toLocaleString()}원
-                                                    </span>
-                                                    {selected && (
-                                                        <div
-                                                            className="flex items-center bg-white rounded-lg border border-gray-200 h-7 overflow-hidden"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (selected.quantity <= 1) {
-                                                                        toggleAddon(addon);
-                                                                    } else {
-                                                                        updateAddonQuantity(addon.id, -1);
-                                                                    }
-                                                                }}
-                                                                className="w-7 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
-                                                            >
-                                                                <Minus size={12} />
-                                                            </button>
-                                                            <span className="w-6 text-center text-xs font-bold text-gray-800">{selected.quantity}</span>
-                                                            <button
-                                                                onClick={() => updateAddonQuantity(addon.id, 1)}
-                                                                className="w-7 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
-                                                            >
-                                                                <Plus size={12} />
-                                                            </button>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })()
+                                : (() => {
+                                    /* 기타 카페: 기존 flat 카드 UI */
+                                    return addonMenus.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {addonMenus.map(addon => {
+                                                const selected = addonSelections.find(a => a.menu.id === addon.id);
+                                                return (
+                                                    <div
+                                                        key={addon.id}
+                                                        className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${selected
+                                                            ? 'border-primary bg-blue-50/50'
+                                                            : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                                                            }`}
+                                                        onClick={() => toggleAddon(addon)}
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <span className="text-lg">{addon.img}</span>
+                                                            <span className={`text-sm font-bold ${selected ? 'text-gray-800' : 'text-gray-600'}`}>
+                                                                {addon.name}
+                                                            </span>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-sm font-bold ${selected ? 'text-primary' : 'text-gray-400'}`}>
+                                                                {addon.price === 0 ? '무료' : (addon.price < 0 ? `${addon.price.toLocaleString()}원` : `+${addon.price.toLocaleString()}원`)}
+                                                            </span>
+                                                            {selected && (
+                                                                <div
+                                                                    className="flex items-center bg-white rounded-lg border border-gray-200 h-7 overflow-hidden"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            if (selected.quantity <= 1) {
+                                                                                toggleAddon(addon);
+                                                                            } else {
+                                                                                updateAddonQuantity(addon.id, -1);
+                                                                            }
+                                                                        }}
+                                                                        className="w-7 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
+                                                                    >
+                                                                        <Minus size={12} />
+                                                                    </button>
+                                                                    <span className="w-6 text-center text-xs font-bold text-gray-800">{selected.quantity}</span>
+                                                                    <button
+                                                                        onClick={() => updateAddonQuantity(addon.id, 1)}
+                                                                        className="w-7 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
+                                                                    >
+                                                                        <Plus size={12} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : null;
+                                })()
+                            }
                         </div>
                     )}
                 </div>

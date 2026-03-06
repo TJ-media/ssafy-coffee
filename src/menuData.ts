@@ -2,7 +2,7 @@ import { Menu } from './shared/types';
 
 export const CAFE_LIST = [
   { id: 'mega', name: '메가커피', img: '🟡' },
-  { id: 'bana', name: '바나프레소', img: '🐰' },
+  { id: 'banapresso', name: '바나프레소', img: '🐰' },
   { id: 'starbucks', name: '스타벅스', img: '🟢' },
   { id: 'compose', name: '컴포즈', img: '🟡' },
 ];

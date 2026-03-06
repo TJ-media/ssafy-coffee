@@ -12,6 +12,11 @@ export interface Menu {
   hasOption: boolean;
   defaultOption?: OptionType; // 커스텀 메뉴의 기본 옵션 저장 (ICE/HOT)
   sizes?: string[]; // 스타벅스 메뉴별 가용 사이즈 (예: ['Short', 'Tall', 'Grande', 'Venti'])
+  options?: string[]; // 해당 메뉴에 적용 가능한 추가 옵션 카테고리 목록 (바나프레소 등)
+  optionsIce?: string[]; // ICE 선택 시 적용 가능한 추가 옵션 (바나프레소)
+  optionsHot?: string[]; // HOT 선택 시 적용 가능한 추가 옵션 (바나프레소)
+  takeoutPrice?: number; // 테이크아웃 ICE 가격이 다를 경우 (바나프레소)
+  takeoutHotPrice?: number; // 테이크아웃 HOT 가격이 다를 경우 (바나프레소)
 }
 
 export interface CartItem {
