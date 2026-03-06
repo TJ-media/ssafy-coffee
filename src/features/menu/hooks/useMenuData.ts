@@ -36,7 +36,8 @@ export const useMenuData = (cafeId: string = 'mega'): UseMenuDataReturn => {
                 if (snapshot.exists()) {
                     const data = snapshot.data() as MenuData;
                     setMenus((data.items || []).sort((a, b) => a.id - b.id));
-                    setCategories(data.categories || []);
+                    const rawCats = (data.categories || []).filter((c: string) => c !== '추가');
+                    setCategories(rawCats.includes('메뉴 추가') ? rawCats : ['메뉴 추가', ...rawCats]);
                 } else {
                     setError('메뉴 데이터를 찾을 수 없습니다.');
                     setMenus([]);

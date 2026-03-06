@@ -390,16 +390,24 @@ const MenuGrid: React.FC<Props> = ({
 
                     <div className="text-5xl mb-3">{menu.img}</div>
 
-                    {selectedSubCategory === '전체' && (
+                    {selectedSubCategory === '전체' && menu.categoryLower && menu.categoryUpper !== '추가' && (
                         <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full mb-1 font-bold">{menu.categoryLower}</span>
                     )}
 
                     <h3 className="font-bold text-gray-800 text-center break-keep mb-1 leading-tight">{menu.name}</h3>
                     <p className="text-sm text-blue-500 font-bold mb-3">
-                        {menu.price.toLocaleString()}원
-                        {menu.hotPrice !== undefined && menu.hotPrice !== menu.price && (
-                            <span className="text-[10px] text-gray-400 ml-1">~</span>
-                        )}
+                        {(() => {
+                            const prices = [menu.price];
+                            if (menu.hotPrice !== undefined) prices.push(menu.hotPrice);
+                            if (menu.takeoutPrice !== undefined) prices.push(menu.takeoutPrice);
+                            if (menu.takeoutHotPrice !== undefined) prices.push(menu.takeoutHotPrice);
+                            const minPrice = Math.min(...prices);
+                            const maxPrice = Math.max(...prices);
+                            if (minPrice === maxPrice) {
+                                return `${minPrice.toLocaleString()}원`;
+                            }
+                            return `${minPrice.toLocaleString()}원~`;
+                        })()}
                     </p>
 
                     <div className="flex w-full gap-2 mt-auto">

@@ -494,7 +494,7 @@ const OrderPage = () => {
             {isCafeSelectOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50" onClick={() => setIsCafeSelectOpen(false)} />
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-bounce-in">
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-slide-up">
                         <h3 className="text-lg font-bold text-center mb-1">카페 선택</h3>
                         <p className="text-xs text-gray-400 text-center mb-5">주문할 카페를 변경합니다</p>
                         <div className="space-y-2">
