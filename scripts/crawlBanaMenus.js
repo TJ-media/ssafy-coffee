@@ -4,8 +4,9 @@ import fs from 'fs';
 
 /**
  * 바나프레소 메뉴 크롤링 스크립트
- * - /query API 응답을 가로채서 메뉴 데이터를 추출
- * - 매장 선택 → 메뉴 순회 → 모달 열기(HOT/ICE) → 모달 닫기
+ * - 바나프레소 주문 페이지에 접속하여 매장 선택 후
+ * - 옵션 마스터 API와 메뉴 데이터 API의 네트워크 응답을 가로채서
+ * - 각 메뉴의 ICE/HOT별 옵션 그룹명(sTitle)을 추출
  * 
  * 실행 방법: node scripts/crawlBanaMenus.js
  */
@@ -23,6 +24,10 @@ const MODAL_SELECTOR = '.modal-detail';
     // /query API 응답을 모두 저장할 배열
     const interceptedData = [];
 
+    // 옵션 마스터 & 메뉴 데이터 저장용
+    let optionMasterRows = null;
+    let menuDataRows = null;
+
     // ── 1. 네트워크 응답 가로채기: /query 엔드포인트 ──
     page.on('response', async (response) => {
         const url = response.url();
@@ -32,13 +37,25 @@ const MODAL_SELECTOR = '.modal-detail';
                 const json = JSON.parse(text);
                 if (json) {
                     const requestBody = response.request().postData();
+                    const parsedBody = requestBody ? JSON.parse(requestBody) : null;
                     console.log(`📡 /query API 캡처`);
                     interceptedData.push({
                         url,
                         timestamp: new Date().toISOString(),
-                        requestBody: requestBody ? JSON.parse(requestBody) : null,
+                        requestBody: parsedBody,
                         data: json,
                     });
+
+                    // 옵션 마스터 API 감지 (queryHash 기반)
+                    if (parsedBody && parsedBody.queryHash === '7426BEAF86B272A76AEE27580B296CF3') {
+                        optionMasterRows = json.rows || [];
+                        console.log(`  ✅ 옵션 마스터 데이터 캡처 완료 (${optionMasterRows.length}행)`);
+                    }
+                    // 메뉴 데이터 API 감지 (queryHash 기반)
+                    if (parsedBody && parsedBody.queryHash === '91D8843AB9D3C73B28F1043252C574AF') {
+                        menuDataRows = json.rows || [];
+                        console.log(`  ✅ 메뉴 데이터 캡처 완료 (${menuDataRows.length}행)`);
+                    }
                 }
             } catch (e) {
                 // JSON 파싱 에러 무시
@@ -94,115 +111,96 @@ const MODAL_SELECTOR = '.modal-detail';
             console.log('⚠️ 매장 선택 버튼을 찾지 못했습니다. 진행합니다.');
         }
 
-        // ── 4. 모든 메뉴 아이템 순회 ──
-        // 전체 메뉴 개수 확인
-        const totalMenus = await page.evaluate(() => {
-            // 메뉴명이 있는 strong 태그를 기준으로 메뉴 아이템 찾기
-            return document.querySelectorAll('ul li strong').length;
-        });
-        console.log(`\n📋 총 ${totalMenus}개 메뉴 발견. 순회를 시작합니다...`);
-
-        for (let i = 0; i < totalMenus; i++) {
-            try {
-                // 1) 스크롤 + 메뉴 위치 확인
-                const menuInfo = await page.evaluate((index) => {
-                    const items = document.querySelectorAll('ul li strong');
-                    const strong = items[index];
-                    if (!strong) return null;
-
-                    const li = strong.closest('li');
-                    if (!li) return null;
-
-                    li.scrollIntoView({ behavior: 'instant', block: 'center' });
-
-                    const rect = li.getBoundingClientRect();
-                    return {
-                        name: strong.textContent.trim(),
-                        x: rect.x + rect.width / 2,
-                        y: rect.y + rect.height / 2
-                    };
-                }, i);
-
-                if (!menuInfo) continue;
-
-                await new Promise(r => setTimeout(r, 500));
-
-                // 2) Puppeteer의 page.mouse.click으로 실제 클릭 (React 이벤트 트리거)
-                await page.mouse.click(menuInfo.x, menuInfo.y);
-
-                // 3) 모달이 열릴 때까지 충분히 대기 (애니메이션 + 렌더링)
-                await new Promise(r => setTimeout(r, 2000));
-
-                // 모달이 열렸는지 확인 (.modal-detail 클래스 기반)
-                const isModalOpen = await page.evaluate(() => {
-                    return !!document.querySelector('.modal-detail');
-                });
-
-                if (!isModalOpen) {
-                    console.log(`  ⚠️ [${i + 1}/${totalMenus}] ${menuInfo.name} - 모달 미열림, 건너뜀`);
-                    await page.keyboard.press('Escape');
-                    await new Promise(r => setTimeout(r, 500));
-                    continue;
-                }
-
-                console.log(`  ✅ [${i + 1}/${totalMenus}] ${menuInfo.name} - 모달 열림`);
-                await new Promise(r => setTimeout(r, 500));
-
-                // 4) HOT 버튼 클릭 시도
-                const hotBtnPos = await page.evaluate(() => {
-                    const btn = document.querySelector('button.hot');
-                    if (!btn) return null;
-                    const rect = btn.getBoundingClientRect();
-                    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-                });
-                if (hotBtnPos) {
-                    await page.mouse.click(hotBtnPos.x, hotBtnPos.y);
-                    await new Promise(r => setTimeout(r, 600));
-                }
-
-                // 5) ICE 버튼 클릭 시도
-                const iceBtnPos = await page.evaluate(() => {
-                    const btn = document.querySelector('button.ice');
-                    if (!btn) return null;
-                    const rect = btn.getBoundingClientRect();
-                    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-                });
-                if (iceBtnPos) {
-                    await page.mouse.click(iceBtnPos.x, iceBtnPos.y);
-                    await new Promise(r => setTimeout(r, 600));
-                }
-
-                // 6) 모달 닫기 - X 버튼 좌표로 클릭
-                const closeBtnPos = await page.evaluate(() => {
-                    const modal = document.querySelector('.modal-detail');
-                    if (!modal) return null;
-                    const closeBtn = modal.querySelector('article > div > button');
-                    if (!closeBtn) return null;
-                    const rect = closeBtn.getBoundingClientRect();
-                    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-                });
-
-                if (closeBtnPos) {
-                    await page.mouse.click(closeBtnPos.x, closeBtnPos.y);
-                } else {
-                    await page.keyboard.press('Escape');
-                }
-
-                // 7) 모달이 완전히 닫히고 React 상태가 안정화될 때까지 충분히 대기
-                await new Promise(r => setTimeout(r, 1500));
-
-            } catch (err) {
-                console.log(`  ⚠️ [${i + 1}/${totalMenus}] 오류 발생: ${err.message}`);
-                await page.keyboard.press('Escape');
-                await new Promise(r => setTimeout(r, 500));
-            }
+        // ── 4. API 데이터가 로드될 때까지 대기 ──
+        console.log('\n⏳ API 데이터 로딩 대기 중...');
+        for (let retry = 0; retry < 30; retry++) {
+            await new Promise(r => setTimeout(r, 1000));
+            if (optionMasterRows && menuDataRows) break;
         }
 
-        // ── 5. 결과 저장 ──
-        const outputPath = './banapresso_menus.json';
-        fs.writeFileSync(outputPath, JSON.stringify(interceptedData, null, 2), 'utf-8');
-        console.log(`\n🎉 크롤링 완료! 총 ${interceptedData.length}개의 API 응답 데이터를 캡처했습니다.`);
-        console.log(`📁 데이터 저장 완료: ${outputPath}`);
+        // ── 5. 옵션 그룹 매핑 구축 ──
+        if (optionMasterRows && menuDataRows) {
+            console.log('\n📊 옵션 그룹 매핑 구축 중...');
+
+            // nGroupID → sTitle(그룹명) 매핑
+            const groupMap = {};
+            optionMasterRows.forEach(row => {
+                const groupId = String(row[1]);
+                const groupName = row[2];
+                if (!groupMap[groupId]) groupMap[groupId] = groupName;
+            });
+            console.log(`  그룹 수: ${Object.keys(groupMap).length}`);
+            console.log('  그룹 목록:', Object.entries(groupMap).map(([id, name]) => `${id}:${name}`).join(', '));
+
+            // 옵션 상세 항목 (추가 메뉴 데이터 생성용)
+            const optionDetails = {};
+            optionMasterRows.forEach(row => {
+                const groupId = String(row[1]);
+                const groupName = row[2];
+                const itemName = row[3];
+                const price = row[4] || 0;
+                if (!optionDetails[groupId]) optionDetails[groupId] = { groupName, items: [] };
+                optionDetails[groupId].items.push({ name: itemName, price });
+            });
+
+            // ── 6. 각 메뉴의 ICE/HOT 옵션 그룹명 추출 ──
+            console.log('\n📋 메뉴별 옵션 추출 중...');
+            const menuOptions = menuDataRows.map(row => {
+                const name = row[4];
+                const optStr = row[9] || '';
+                const parts = optStr.split(';').filter(s => s.trim());
+
+                let optionsIce = [];
+                let optionsHot = [];
+
+                if (parts.length >= 1) {
+                    optionsIce = [...new Set(
+                        parts[0].split(',')
+                            .filter(id => id.trim())
+                            .map(id => groupMap[id.trim()])
+                            .filter(Boolean)
+                    )];
+                }
+                if (parts.length >= 2) {
+                    optionsHot = [...new Set(
+                        parts[1].split(',')
+                            .filter(id => id.trim())
+                            .map(id => groupMap[id.trim()])
+                            .filter(Boolean)
+                    )];
+                }
+
+                return { name, optionsIce, optionsHot };
+            });
+
+            // ── 7. 결과 저장 ──
+            const output = {
+                groupMap,
+                optionDetails,
+                menus: menuOptions,
+            };
+            const outputPath = './banapresso_options.json';
+            fs.writeFileSync(outputPath, JSON.stringify(output, null, 2), 'utf-8');
+            console.log(`\n🎉 옵션 데이터 추출 완료!`);
+            console.log(`📁 데이터 저장: ${outputPath}`);
+
+            // 검증 출력
+            const americano = menuOptions.find(m => m.name === '아메리카노');
+            if (americano) {
+                console.log('\n검증 - 아메리카노:');
+                console.log('  ICE:', americano.optionsIce);
+                console.log('  HOT:', americano.optionsHot);
+            }
+        } else {
+            console.log('⚠️ API 데이터를 캡처하지 못했습니다.');
+            console.log(`  옵션 마스터: ${optionMasterRows ? '있음' : '없음'}`);
+            console.log(`  메뉴 데이터: ${menuDataRows ? '있음' : '없음'}`);
+        }
+
+        // ── 8. raw 데이터도 저장 ──
+        const rawOutputPath = './banapresso_menus.json';
+        fs.writeFileSync(rawOutputPath, JSON.stringify(interceptedData, null, 2), 'utf-8');
+        console.log(`\n📁 raw API 데이터 저장: ${rawOutputPath}`);
 
     } catch (error) {
         console.error('❌ 크롤링 중 오류가 발생했습니다:', error);
