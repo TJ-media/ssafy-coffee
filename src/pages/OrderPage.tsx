@@ -18,6 +18,7 @@ import Toast from '../shared/ui/Toast';
 import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi, changeCafeApi } from '../features/order/api/firebaseApi';
 import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType } from '../shared/types';
 import { CAFE_LIST } from '../menuData';
+import { getCafeTheme } from '../shared/config/cafeTheme';
 
 const OrderPage = () => {
     // 1. Firebase 실시간 구독 생명주기 연결
@@ -27,6 +28,7 @@ const OrderPage = () => {
     const { menus: allMenus, categories } = useMenuData(selectedCafe);
     const navigate = useNavigate();
     const { searchQuery, setSearchQuery, isSearchMode, setIsSearchMode, searchResults, convertedQuery, clearSearch } = useMenuSearch(allMenus);
+    const cafeTheme = getCafeTheme(selectedCafe);
 
     // 2. Zustand 선택적 구독 (Selector를 통해 필요한 상태만 개별 구독하여 렌더링 방어)
     const groupId = useOrderStore(state => state.groupId);
@@ -442,6 +444,7 @@ const OrderPage = () => {
                         onDeleteCustomMenu={deleteCustomMenuHandler}
                         groupId={groupId || ''}
                         userName={userName}
+                        selectedCafe={selectedCafe}
                     />
                 </div>
             )}
@@ -457,7 +460,7 @@ const OrderPage = () => {
                     className={`absolute bottom-6 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center text-white z-30 transition-transform active:scale-95 
                   ${editingHistoryInfo
                             ? 'bg-indigo-500 hover:bg-indigo-600 animate-fly-from-center'
-                            : 'bg-primary hover:bg-primary-dark animate-bounce-in'}`}
+                            : `${cafeTheme.primaryColor} animate-bounce-in`}`}
                 >
                     <div className="relative">
                         {editingHistoryInfo ? <Pencil size={28} /> : <ShoppingCart size={28} />}
@@ -487,6 +490,7 @@ const OrderPage = () => {
                     onClear={handleOrderComplete}
                     onClose={() => setIsCartOpen(false)}
                     onEdit={() => { }}
+                    selectedCafe={selectedCafe}
                 />
             )}
 

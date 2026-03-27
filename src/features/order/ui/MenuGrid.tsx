@@ -3,6 +3,7 @@ import { Menu, OptionType } from '../../../shared/types';
 import { Heart, Plus, Coffee, History, Trash2, Snowflake, Flame, Send, MessageSquarePlus, Loader2, CheckCircle } from 'lucide-react';
 import { submitMenuRequest } from '../api/menuRequestApi';
 import { useLayoutStore } from '../../../shared/store/useLayoutStore';
+import { getCafeTheme } from '../../../shared/config/cafeTheme';
 
 interface Props {
     selectedCategory: string;
@@ -17,15 +18,17 @@ interface Props {
     onDeleteCustomMenu: (id: number) => void;
     groupId: string;
     userName: string;
+    selectedCafe?: string;
 }
 
 const MenuGrid: React.FC<Props> = ({
     selectedCategory, selectedSubCategory, favoriteMenuIds,
     onAddToCart, onToggleFavorite, onMenuSelect,
     menus, customMenus, onSaveCustomMenu, onDeleteCustomMenu,
-    groupId, userName
+    groupId, userName, selectedCafe
 }) => {
     const viewMode = useLayoutStore(state => state.viewMode);
+    const theme = getCafeTheme(selectedCafe || 'mega');
     const [customName, setCustomName] = useState('');
     const [customPrice, setCustomPrice] = useState('');
     const [customOption, setCustomOption] = useState<OptionType>('ICE');
@@ -376,8 +379,64 @@ const MenuGrid: React.FC<Props> = ({
         );
     }
 
+    // list 레이아웃 — 모바일
+    if (viewMode === 'mobile') {
+        return (
+            <div className="space-y-3 pb-16">
+                {filteredMenus.map(menu => (
+                    <div
+                        key={menu.id}
+                        onClick={() => onMenuSelect(menu)}
+                        className="bg-white px-4 py-3.5 rounded-2xl shadow-sm flex items-center gap-4 transition hover:-translate-y-0.5 relative group cursor-pointer"
+                    >
+                        {/* 좌측 이모지 (원형 배경) */}
+                        <div className={`w-14 h-14 ${theme.primaryBgLight} rounded-full flex items-center justify-center text-3xl shrink-0`}>
+                            {menu.img}
+                        </div>
+
+                        {/* 중앙 메뉴 정보 */}
+                        <div className="flex-1 min-w-0">
+                            {selectedSubCategory === '전체' && menu.categoryLower && menu.categoryUpper !== '추가' && (
+                                <span className={`text-[10px] ${theme.primaryTextColor} ${theme.primaryBgLight} px-2 py-0.5 rounded-full mb-1 font-bold inline-block`}>{menu.categoryLower}</span>
+                            )}
+                            <h3 className="font-bold text-gray-800 truncate leading-tight">{menu.name}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                                {menu.hasOption && (
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-500 font-bold">ICE</span>
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-400 font-bold">HOT</span>
+                                    </div>
+                                )}
+                                <p className={`text-sm ${theme.priceTextColor} font-bold`}>
+                                    {(() => {
+                                        const prices = [menu.price];
+                                        if (menu.hotPrice !== undefined) prices.push(menu.hotPrice);
+                                        if (menu.takeoutPrice !== undefined) prices.push(menu.takeoutPrice);
+                                        if (menu.takeoutHotPrice !== undefined) prices.push(menu.takeoutHotPrice);
+                                        const minPrice = Math.min(...prices);
+                                        const maxPrice = Math.max(...prices);
+                                        if (minPrice === maxPrice) {
+                                            return `${minPrice.toLocaleString()}원`;
+                                        }
+                                        return `${minPrice.toLocaleString()}원~`;
+                                    })()}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* 우측 즐겨찾기 */}
+                        <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(menu); }} className="p-1.5 hover:scale-110 transition shrink-0">
+                            <Heart size={20} className={`${favoriteMenuIds.includes(menu.id) ? 'text-red-500 fill-red-500' : 'text-gray-300'} transition-colors`} />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    // grid-2col 레이아웃 — 데스크탑 (4열)
     return (
-        <div className={`grid gap-4 pb-16 ${viewMode === 'desktop' ? 'grid-cols-3 lg:grid-cols-4' : 'grid-cols-2'}`}>
+        <div className="grid grid-cols-4 gap-4 pb-16">
             {filteredMenus.map(menu => (
                 <div
                     key={menu.id}
@@ -391,11 +450,11 @@ const MenuGrid: React.FC<Props> = ({
                     <div className="text-5xl mb-3">{menu.img}</div>
 
                     {selectedSubCategory === '전체' && menu.categoryLower && menu.categoryUpper !== '추가' && (
-                        <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full mb-1 font-bold">{menu.categoryLower}</span>
+                        <span className={`text-[10px] ${theme.priceTextColor} ${theme.primaryBgLight} px-2 py-0.5 rounded-full mb-1 font-bold`}>{menu.categoryLower}</span>
                     )}
 
                     <h3 className="font-bold text-gray-800 text-center break-keep mb-1 leading-tight">{menu.name}</h3>
-                    <p className="text-sm text-blue-500 font-bold mb-3">
+                    <p className={`text-sm ${theme.priceTextColor} font-bold mb-3`}>
                         {(() => {
                             const prices = [menu.price];
                             if (menu.hotPrice !== undefined) prices.push(menu.hotPrice);
