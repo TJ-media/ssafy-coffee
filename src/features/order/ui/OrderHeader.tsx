@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Link, History, Target, LogOut, Heart, ChevronLeft, ChevronRight, Settings, Search, ChevronDown } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
 import { CAFE_LIST } from '../../../menuData';
+import { getCafeTheme } from '../../../shared/config/cafeTheme';
 
 interface Props {
     groupId: string;
@@ -29,6 +30,7 @@ const OrderHeader: React.FC<Props> = ({
     onOpenHistory, onOpenPinball, onOpenSettings, onCopyLink, onLogout,
     onToggleSearch, isSearchMode, selectedCafe, onChangeCafe
 }) => {
+    const theme = getCafeTheme(selectedCafe || 'mega');
     const categoryScrollRef = useRef<HTMLDivElement>(null);
     const subCategoryScrollRef = useRef<HTMLDivElement>(null);
 
@@ -122,9 +124,9 @@ const OrderHeader: React.FC<Props> = ({
             <div className="relative group px-6 pb-2">
                 {canScrollCatLeft && <button onClick={() => scrollContainer(categoryScrollRef, 'left')} className="absolute left-0 top-0 bottom-2 z-10 w-14 bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-3 text-gray-400 hover:text-primary transition-colors"><ChevronLeft size={24} /></button>}
                 <div ref={categoryScrollRef} onScroll={() => checkScroll(categoryScrollRef, setCanScrollCatLeft, setCanScrollCatRight)} className="flex overflow-x-auto space-x-2 no-scrollbar">
-                    <button onClick={() => onSelectCategory('즐겨찾기')} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap flex items-center gap-1 shrink-0 ${selectedCategory === '즐겨찾기' ? 'bg-primary text-white shadow-md' : 'bg-white hover:bg-gray-50'}`}><Heart size={14} fill={selectedCategory === '즐겨찾기' ? 'white' : 'none'} /> 즐겨찾기</button>
+                    <button onClick={() => onSelectCategory('즐겨찾기')} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap flex items-center gap-1 shrink-0 ${selectedCategory === '즐겨찾기' ? `${theme.primaryColor} text-white shadow-md` : 'bg-white hover:bg-gray-50'}`}><Heart size={14} fill={selectedCategory === '즐겨찾기' ? 'white' : 'none'} /> 즐겨찾기</button>
                     {categories.map(cat => (
-                        <button key={cat} onClick={() => onSelectCategory(cat)} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap shrink-0 ${selectedCategory === cat ? 'bg-primary text-white shadow-md' : 'bg-white hover:bg-gray-50'}`}>{cat}</button>
+                        <button key={cat} onClick={() => onSelectCategory(cat)} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap shrink-0 ${selectedCategory === cat ? `${theme.primaryColor} text-white shadow-md` : 'bg-white hover:bg-gray-50'}`}>{cat}</button>
                     ))}
                 </div>
                 {canScrollCatRight && <button onClick={() => scrollContainer(categoryScrollRef, 'right')} className="absolute right-0 top-0 bottom-2 z-10 w-14 bg-gradient-to-l from-white via-white/80 to-transparent flex items-center justify-end pr-3 text-gray-400 hover:text-primary transition-colors"><ChevronRight size={24} /></button>}
@@ -136,7 +138,7 @@ const OrderHeader: React.FC<Props> = ({
                     {canScrollSubLeft && <button onClick={() => scrollContainer(subCategoryScrollRef, 'left')} className="absolute left-0 top-3 bottom-3 z-10 w-12 bg-gradient-to-r from-gray-50 via-gray-50/80 to-transparent flex items-center justify-start pl-3 text-gray-400 hover:text-primary transition-colors"><ChevronLeft size={20} /></button>}
                     <div ref={subCategoryScrollRef} onScroll={() => checkScroll(subCategoryScrollRef, setCanScrollSubLeft, setCanScrollSubRight)} className="flex overflow-x-auto space-x-2 no-scrollbar">
                         {subCategories.map(sub => (
-                            <button key={sub} onClick={() => onSelectSubCategory(sub)} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border shrink-0 ${selectedSubCategory === sub ? 'bg-white border-primary text-primary' : 'border-transparent text-text-secondary hover:bg-gray-200'}`}>{sub}</button>
+                            <button key={sub} onClick={() => onSelectSubCategory(sub)} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border shrink-0 ${selectedSubCategory === sub ? `bg-white border-current ${theme.primaryTextColor}` : 'border-transparent text-text-secondary hover:bg-gray-200'}`}>{sub}</button>
                         ))}
                     </div>
                     {canScrollSubRight && <button onClick={() => scrollContainer(subCategoryScrollRef, 'right')} className="absolute right-0 top-3 bottom-3 z-10 w-12 bg-gradient-to-l from-gray-50 via-gray-50/80 to-transparent flex items-center justify-end pr-3 text-gray-400 hover:text-primary transition-colors"><ChevronRight size={20} /></button>}
