@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { ShoppingCart, Pencil } from 'lucide-react';
+import { ShoppingCart, Pencil, X, ExternalLink, Copy, Check, Smartphone, ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderInitialize } from '../features/order/hooks/useOrderLogic';
 import { useOrderStore } from '../features/order/store/useOrderStore';
@@ -15,11 +15,12 @@ import RouletteModal from '../features/roulette/ui/RouletteModal';
 import SettingsModal from '../features/order/ui/SettingsModal';
 import SearchBar from '../features/order/ui/SearchBar';
 import Toast from '../shared/ui/Toast';
-import OrderRedirectModal from '../shared/ui/OrderRedirectModal';
 import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi, changeCafeApi } from '../features/order/api/firebaseApi';
 import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType, GroupedCartItem } from '../shared/types';
 import { CAFE_LIST } from '../menuData';
 import { getCafeTheme } from '../shared/config/cafeTheme';
+import { useLayoutStore } from '../shared/store/useLayoutStore';
+import { CAFE_DEEP_LINKS } from '../shared/config/cafeDeepLinks';
 
 const OrderPage = () => {
     // 1. Firebase 실시간 구독 생명주기 연결
@@ -78,10 +79,13 @@ const OrderPage = () => {
     const [pendingCafe, setPendingCafe] = useState<string | null>(null);
     const [isCafeConfirmOpen, setIsCafeConfirmOpen] = useState(false);
 
-    // 주문 완료 모달 상태
-    const [isOrderConfirmOpen, setIsOrderConfirmOpen] = useState(false);
-    const [isOrderRedirectOpen, setIsOrderRedirectOpen] = useState(false);
-    const [orderSnapshot, setOrderSnapshot] = useState<{ items: GroupedCartItem[]; totalPrice: number } | null>(null);
+    // 주문 완료 통합 모달 상태
+    const [orderModalStep, setOrderModalStep] = useState<null | 'confirm' | 'redirect'>(null);
+    const [orderRedirectItems, setOrderRedirectItems] = useState<GroupedCartItem[]>([]);
+    const [orderRedirectTotal, setOrderRedirectTotal] = useState(0);
+    const [orderRedirectCopied, setOrderRedirectCopied] = useState(false);
+    const [pendingHistory, setPendingHistory] = useState<OrderHistory | null>(null);
+    const isDesktopDevice = useLayoutStore(state => state.isDesktopDevice);
 
     useEffect(() => {
         if (selectedCategory === '메뉴 추가') {
@@ -206,27 +210,39 @@ const OrderPage = () => {
         addToast('삭제되었습니다');
     };
 
+    const buildOrderText = (name: string, items: GroupedCartItem[], total: number) => [
+        `[${name}] 주문 목록`,
+        ...items.map(item => `- ${item.menuName}${item.option !== 'ONLY' ? ` (${item.option})` : ''} x${item.count}`),
+        `총 ${items.reduce((s, i) => s + i.count, 0)}잔 / ${total.toLocaleString()}원`,
+    ].join('\n');
+
+    const copyText = async (text: string) => {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const el = document.createElement('textarea');
+                el.value = text; el.style.position = 'fixed'; el.style.left = '-9999px';
+                document.body.appendChild(el); el.select(); document.execCommand('copy');
+                document.body.removeChild(el);
+            }
+            return true;
+        } catch { return false; }
+    };
+
     const handleOrderComplete = () => {
         if (!groupId || cart.length === 0) return;
-        setIsOrderConfirmOpen(true);
+        setOrderModalStep('confirm');
     };
 
     const executeOrderComplete = async (openRedirect: boolean) => {
         if (!groupId || cart.length === 0) return;
-        setIsOrderConfirmOpen(false);
 
-        // 리다이렉트 모달용 스냅샷 (카트 비우기 전에 캡처)
         const itemMap: Record<string, HistoryItem> = {};
         cart.forEach(cartItem => {
             const key = `${cartItem.menuName}_${cartItem.option}`;
             if (!itemMap[key]) {
-                itemMap[key] = {
-                    menuName: cartItem.menuName,
-                    option: cartItem.option,
-                    price: cartItem.price,
-                    count: 0,
-                    orderedBy: []
-                };
+                itemMap[key] = { menuName: cartItem.menuName, option: cartItem.option, price: cartItem.price, count: 0, orderedBy: [] };
             }
             itemMap[key].count += 1;
             itemMap[key].orderedBy.push(cartItem.userName);
@@ -235,39 +251,80 @@ const OrderPage = () => {
         const historyItems = Object.values(itemMap);
         const participants = [...new Set(cart.map(c => c.userName))];
         const snapshotItems: GroupedCartItem[] = historyItems.map(item => ({
-            menuName: item.menuName,
-            option: item.option,
-            price: item.price,
-            count: item.count,
-            names: item.orderedBy,
+            menuName: item.menuName, option: item.option, price: item.price, count: item.count, names: item.orderedBy,
         }));
+        const snapshotTotal = totalPrice;
+        const cafeName = CAFE_LIST.find(c => c.id === selectedCafe)?.name ?? '';
 
         const newHistory: OrderHistory = {
-            id: Date.now().toString(),
-            orderedAt: new Date(),
-            totalPrice: totalPrice,
-            totalItems: cart.length,
-            items: historyItems,
-            participants,
-            winner: null,
-            cafeName: CAFE_LIST.find(c => c.id === selectedCafe)?.name,
+            id: Date.now().toString(), orderedAt: new Date(),
+            totalPrice: snapshotTotal, totalItems: cart.length,
+            items: historyItems, participants, winner: null, cafeName,
         };
 
-        try {
-            await updateHistoryApi(groupId, [newHistory, ...history], 'normal');
-            await updateCartApi(groupId, []);
-
-            setIsCartOpen(false);
-            addToast('주문이 완료되었습니다!', 'success');
-
-            if (openRedirect) {
-                setOrderSnapshot({ items: snapshotItems, totalPrice });
-                setIsOrderRedirectOpen(true);
+        setIsCartOpen(false);
+        if (openRedirect) {
+            // 리다이렉트 단계로 즉시 전환 — Firebase 쓰기는 finalizeOrder에서 처리
+            setOrderRedirectItems(snapshotItems);
+            setOrderRedirectTotal(snapshotTotal);
+            setPendingHistory(newHistory);
+            setOrderModalStep('redirect');
+            copyText(buildOrderText(cafeName, snapshotItems, snapshotTotal)).then(ok => setOrderRedirectCopied(ok));
+        } else {
+            // 기록만 할게요 — 즉시 저장
+            setOrderModalStep(null);
+            try {
+                await Promise.all([
+                    updateHistoryApi(groupId, [newHistory, ...history], 'normal'),
+                    updateCartApi(groupId, []),
+                ]);
+                addToast('주문이 완료되었습니다!', 'success');
+            } catch (e) {
+                console.error('주문 완료 실패:', e);
+                addToast('주문 완료에 실패했습니다.', 'warning');
             }
+        }
+    };
+
+    const handleRedirectCopy = async () => {
+        const cafeName = CAFE_LIST.find(c => c.id === selectedCafe)?.name ?? '';
+        const ok = await copyText(buildOrderText(cafeName, orderRedirectItems, orderRedirectTotal));
+        if (ok) setOrderRedirectCopied(true);
+    };
+
+    const finalizeOrder = async () => {
+        const saved = pendingHistory;
+        setOrderModalStep(null);
+        setPendingHistory(null);
+        if (!groupId || !saved) return;
+        try {
+            await Promise.all([
+                updateHistoryApi(groupId, [saved, ...history], 'normal'),
+                updateCartApi(groupId, []),
+            ]);
+            addToast('주문이 완료되었습니다!', 'success');
         } catch (e) {
             console.error('주문 완료 실패:', e);
             addToast('주문 완료에 실패했습니다.', 'warning');
         }
+    };
+
+    const handleRedirectOpenApp = () => {
+        const deepLink = CAFE_DEEP_LINKS[selectedCafe];
+        if (!deepLink) return;
+        handleRedirectCopy();
+        finalizeOrder();
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const appUrl = isIOS ? deepLink.ios : deepLink.android;
+        const fallbackUrl = isIOS ? deepLink.fallback.ios : deepLink.fallback.android;
+        let appOpened = false;
+        const onVis = () => { if (document.hidden) appOpened = true; };
+        document.addEventListener('visibilitychange', onVis);
+        window.location.href = appUrl;
+        setTimeout(() => {
+            document.removeEventListener('visibilitychange', onVis);
+            if (!appOpened) window.open(fallbackUrl, '_blank');
+        }, 3000);
     };
 
     const handleUpdateWinner = async (historyId: string, type: 'normal' | 'roulette', winner: string) => {
@@ -517,52 +574,178 @@ const OrderPage = () => {
                 />
             )}
 
-            {/* 주문 완료 확인 모달 */}
-            {isOrderConfirmOpen && (
+            {/* 주문 완료 통합 모달 */}
+            {orderModalStep && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setIsOrderConfirmOpen(false)} />
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6 animate-bounce-in">
-                        <div className="text-center">
-                            <div className="text-4xl mb-3">🛒</div>
-                            <h3 className="text-lg font-bold mb-2">주문을 완료할까요?</h3>
-                            <p className="text-sm text-gray-500 mb-5">
-                                주문 기록이 저장되고<br />장바구니가 비워집니다.
-                            </p>
+                    <div className="absolute inset-0 bg-black/50" onClick={() => orderModalStep === 'redirect' ? finalizeOrder() : setOrderModalStep(null)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm animate-bounce-in overflow-hidden min-h-[400px] flex flex-col">
+                        {/* 핸들 */}
+                        <div className="flex justify-center pt-3 pb-1 shrink-0">
+                            <div className="w-10 h-1 bg-gray-200 rounded-full" />
                         </div>
-                        <div className="flex flex-col gap-2">
-                            <button
-                                onClick={() => executeOrderComplete(true)}
-                                className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98]"
-                            >
-                                기록하고 주문하러 가기
-                            </button>
-                            <button
-                                onClick={() => executeOrderComplete(false)}
-                                className="w-full py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition active:scale-[0.98]"
-                            >
-                                기록만 할게요
-                            </button>
-                            <button
-                                onClick={() => setIsOrderConfirmOpen(false)}
-                                className="w-full py-2 text-gray-400 text-sm hover:text-gray-600 transition"
-                            >
-                                취소
-                            </button>
-                        </div>
+
+                        {orderModalStep === 'confirm' ? (
+                            <div className="flex-1 flex flex-col justify-center px-6 py-8">
+                                <div className="text-center mb-7">
+                                    <div className="text-4xl mb-3">🛒</div>
+                                    <h3 className="text-lg font-bold mb-2">주문을 완료할까요?</h3>
+                                    <p className="text-sm text-gray-500">
+                                        주문 기록이 저장되고<br />장바구니가 비워집니다.
+                                    </p>
+                                </div>
+                                <div className="flex flex-col gap-2 w-full">
+                                    <button
+                                        onClick={() => executeOrderComplete(true)}
+                                        className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98]"
+                                    >
+                                        기록하고 주문하러 가기
+                                    </button>
+                                    <button
+                                        onClick={() => executeOrderComplete(false)}
+                                        className="w-full py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition active:scale-[0.98]"
+                                    >
+                                        기록만 할게요
+                                    </button>
+                                    <button
+                                        onClick={() => setOrderModalStep(null)}
+                                        className="w-full py-2 text-gray-400 text-sm hover:text-gray-600 transition"
+                                    >
+                                        취소
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (() => {
+                            const cafeName = CAFE_LIST.find(c => c.id === selectedCafe)?.name ?? '';
+                            const hasDeepLink = !!CAFE_DEEP_LINKS[selectedCafe];
+                            const webOrderUrl = CAFE_DEEP_LINKS[selectedCafe]?.webOrder;
+                            const totalCount = orderRedirectItems.reduce((s, i) => s + i.count, 0);
+                            return (
+                                <div className="flex-1 flex flex-col">
+                                    {/* 헤더 */}
+                                    <div className="flex items-center justify-between px-5 pt-2 pb-3 shrink-0">
+                                        <button
+                                            onClick={() => setOrderModalStep('confirm')}
+                                            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600 shrink-0"
+                                        >
+                                            <ChevronLeft size={18} />
+                                        </button>
+                                        <h3 className="text-base font-bold text-text-primary">
+                                            {cafeName} {isDesktopDevice && webOrderUrl ? '웹에서' : '앱에서'} 주문하기
+                                        </h3>
+                                        <button
+                                            onClick={finalizeOrder}
+                                            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600 shrink-0"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+
+                                    {/* 중앙 콘텐츠 */}
+                                    <div className="flex-1 flex flex-col justify-center px-5 py-2 gap-4">
+                                        {/* 주문 목록 */}
+                                        <div>
+                                            <div className="bg-background rounded-2xl p-3 max-h-44 overflow-y-auto custom-scrollbar">
+                                                <div className="space-y-1.5">
+                                                    {orderRedirectItems.map((item, i) => (
+                                                        <div key={i} className="flex justify-between items-center text-sm">
+                                                            <span className="text-text-primary font-medium">
+                                                                {item.menuName}
+                                                                {item.option !== 'ONLY' && (
+                                                                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-md font-bold ${item.option === 'ICE' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                                                        {item.option}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <span className="text-text-secondary ml-2">x{item.count}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="border-t border-gray-200 mt-2.5 pt-2.5 flex justify-between text-sm">
+                                                    <span className="text-text-secondary">총 {totalCount}잔</span>
+                                                    <span className="text-primary font-bold">{orderRedirectTotal.toLocaleString()}원</span>
+                                                </div>
+                                            </div>
+                                            {orderRedirectCopied && (
+                                                <div className="flex items-center gap-1.5 mt-2 text-xs text-green-600 font-medium">
+                                                    <Check size={13} />주문 목록이 클립보드에 복사되었습니다
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 데스크톱 안내 */}
+                                        {isDesktopDevice && (
+                                            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 flex gap-2">
+                                                <Smartphone size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                                                {webOrderUrl ? (
+                                                    <p className="text-xs text-blue-600 leading-relaxed">
+                                                        웹 주문 페이지로 이동하거나,<br />복사된 주문 목록을 모바일 앱에서 사용하세요.
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-blue-600 leading-relaxed">
+                                                        PC에서는 앱을 직접 열 수 없습니다.<br />복사된 주문 목록을 모바일 기기의 카페 앱에서 사용해주세요.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 버튼 */}
+                                    <div className="px-5 pb-6 pt-3 flex gap-2">
+                                        {isDesktopDevice ? (
+                                            <>
+                                                <button
+                                                    onClick={finalizeOrder}
+                                                    className="flex-1 py-3.5 rounded-2xl bg-gray-100 text-text-secondary font-bold text-sm hover:bg-gray-200 transition active:scale-[0.98]"
+                                                >
+                                                    {webOrderUrl ? '나중에 할게요' : '닫기'}
+                                                </button>
+                                                {webOrderUrl ? (
+                                                    <button
+                                                        onClick={() => { finalizeOrder(); window.open(webOrderUrl, '_blank'); }}
+                                                        className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
+                                                    >
+                                                        <ExternalLink size={14} />웹으로 주문하기
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleRedirectCopy}
+                                                        className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
+                                                    >
+                                                        <Copy size={14} />주문 목록 복사
+                                                    </button>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    onClick={finalizeOrder}
+                                                    className="flex-1 py-3.5 rounded-2xl bg-gray-100 text-text-secondary font-bold text-sm hover:bg-gray-200 transition active:scale-[0.98]"
+                                                >
+                                                    나중에 할게요
+                                                </button>
+                                                {hasDeepLink ? (
+                                                    <button
+                                                        onClick={handleRedirectOpenApp}
+                                                        className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
+                                                    >
+                                                        <ExternalLink size={14} />{cafeName} 앱 열기
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleRedirectCopy}
+                                                        className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
+                                                    >
+                                                        <Copy size={14} />주문 목록 복사
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
-            )}
-
-            {/* 주문 앱 연동 모달 */}
-            {orderSnapshot && (
-                <OrderRedirectModal
-                    isOpen={isOrderRedirectOpen}
-                    onClose={() => { setIsOrderRedirectOpen(false); setOrderSnapshot(null); }}
-                    cafeName={CAFE_LIST.find(c => c.id === selectedCafe)?.name || ''}
-                    cafeId={selectedCafe}
-                    orderItems={orderSnapshot.items}
-                    totalPrice={orderSnapshot.totalPrice}
-                />
             )}
 
             {/* 카페 선택 모달 */}
