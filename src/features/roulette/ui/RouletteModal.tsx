@@ -232,12 +232,13 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 
     if (!isOpen) return null;
 
+    // 결과 화면
     if (status === 'finished' && gameState?.winner) {
         return (
             <>
-                <div className="fixed inset-0 bg-black/80 z-40" onClick={onClose} />
+                <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
                 <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-gray-700 pinball-modal-enter max-h-[90vh] overflow-y-auto custom-scrollbar">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 pinball-modal-enter max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <RouletteResult
                             winner={gameState.winner}
                             finishOrder={gameState.finishOrder}
@@ -245,6 +246,8 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
                             isWinner={isWinner}
                             orderItems={groupedCart}
                             totalPrice={totalPrice}
+                            cafeId={selectedCafe}
+                            cafeName={CAFE_LIST.find(c => c.id === selectedCafe)?.name || ''}
                         />
                     </div>
                 </div>
@@ -256,60 +259,102 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/80 z-40" onClick={canClose ? onClose : undefined} />
+            <div className="fixed inset-0 bg-black/50 z-40" onClick={canClose ? onClose : undefined} />
             <div className="fixed inset-0 flex items-center justify-center z-50 p-2">
-                <div className="bg-gray-900 rounded-2xl shadow-2xl w-[95vw] h-[95vh] overflow-hidden flex flex-col pinball-modal-enter border border-gray-700">
-                    <div className="flex justify-between items-center px-4 py-2 border-b border-gray-700 shrink-0">
-                        <h2 className="text-lg font-bold flex items-center gap-2 text-white"><span className="text-2xl">🎡</span>커피 내기 룰렛</h2>
-                        {canClose && <button onClick={onClose} className="text-gray-400 hover:text-white transition p-1"><X size={24} /></button>}
+                <div className="bg-surface rounded-2xl shadow-2xl w-[95vw] h-[95vh] overflow-hidden flex flex-col pinball-modal-enter">
+                    {/* 헤더 */}
+                    <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100 shrink-0">
+                        <h2 className="text-lg font-bold flex items-center gap-2 text-text-primary">
+                            <span className="text-2xl">🎡</span>커피 내기 룰렛
+                        </h2>
+                        {canClose && (
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition p-1">
+                                <X size={24} />
+                            </button>
+                        )}
                     </div>
+
                     <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden">
                         <div className="flex-1 relative">
+                            {/* 게임 캔버스 */}
                             <canvas
                                 ref={canvasRef}
                                 className={`w-full h-full rounded-xl bg-black ${!isRouletteReady ? 'hidden' : ''}`}
-                            ></canvas>
+                            />
 
+                            {/* 로딩 */}
                             {!isRouletteReady && (
-                                <div className="absolute inset-0 bg-gray-800 rounded-xl flex items-center justify-center">
-                                    <div className="text-center text-gray-400">
+                                <div className="absolute inset-0 bg-background rounded-xl flex items-center justify-center">
+                                    <div className="text-center text-text-secondary">
                                         <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-                                        <p className="text-lg">룰렛 로딩 중...</p>
+                                        <p className="text-lg font-bold">룰렛 로딩 중...</p>
                                     </div>
                                 </div>
                             )}
 
+                            {/* 대기실 오버레이 */}
                             {status === 'waiting' && isRouletteReady && (
-                                <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center p-4 h-full">
-                                    <div className="bg-gray-800/95 rounded-2xl p-6 shadow-xl max-w-[320px] w-full border border-gray-600">
+                                <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center p-4">
+                                    <div className="bg-white rounded-2xl p-6 shadow-xl max-w-[320px] w-full">
                                         <div className="text-center mb-4">
                                             <Users size={40} className="text-primary mx-auto mb-2" />
-                                            <h3 className="text-xl font-bold text-white">대기실</h3>
-                                            <p className="text-sm text-gray-400">참가자들을 확인하세요!</p>
+                                            <h3 className="text-xl font-bold text-text-primary">대기실</h3>
+                                            <p className="text-sm text-text-secondary">참가자들을 확인하세요!</p>
                                         </div>
-                                        <div className="bg-gray-700/50 rounded-xl p-3 mb-4">
-                                            <p className="text-xs text-gray-400 mb-2 font-bold">참가자 ({gameState?.participants?.length || 0}명) · 🎱 = 당첨 확률</p>
+
+                                        {/* 참가자 목록 */}
+                                        <div className="bg-background rounded-xl p-3 mb-4">
+                                            <p className="text-xs text-text-secondary mb-2 font-bold">
+                                                참가자 ({gameState?.participants?.length || 0}명) · 🎱 = 당첨 확률
+                                            </p>
                                             <div className="flex flex-wrap gap-1.5 justify-center">
                                                 {gameState?.participants?.map((name) => {
                                                     const marbleCount = getParticipantMarbleCount(name);
                                                     return (
-                                                        <div key={name} className="flex items-center gap-1.5 px-2 py-1 bg-gray-600 rounded-full">
-                                                            <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold" style={{ backgroundColor: getAvatarColor(name), color: getTextContrastColor() }}>{name.slice(0, 1)}</div>
-                                                            <span className="text-xs font-medium text-gray-200">{name}{name === gameState?.hostName && <span className="ml-0.5 text-[10px] text-primary">(방장)</span>}</span>
-                                                            {marbleCount > 1 && <span className="text-[10px] bg-amber-500/30 text-amber-300 px-1 rounded font-bold">🎱x{marbleCount}</span>}
+                                                        <div key={name} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white rounded-full border border-gray-100 shadow-sm">
+                                                            <div
+                                                                className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
+                                                                style={{ backgroundColor: getAvatarColor(name), color: getTextContrastColor() }}
+                                                            >
+                                                                {name.slice(0, 1)}
+                                                            </div>
+                                                            <span className="text-xs font-medium text-text-primary">
+                                                                {name}
+                                                                {name === gameState?.hostName && (
+                                                                    <span className="ml-0.5 text-[10px] text-primary">(방장)</span>
+                                                                )}
+                                                            </span>
+                                                            {marbleCount > 1 && (
+                                                                <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1 rounded font-bold">
+                                                                    🎱x{marbleCount}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
                                             </div>
                                         </div>
+
                                         {isHost ? (
                                             <div className="flex flex-col gap-2">
-                                                <button onClick={handleStartGame} className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition shadow-md text-lg"><Play size={20} />게임 시작!</button>
-                                                <button onClick={handleShuffle} className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-gray-600 text-gray-200 rounded-xl font-medium hover:bg-gray-500 transition text-sm"><Shuffle size={14} />위치 셔플</button>
+                                                <button
+                                                    onClick={handleStartGame}
+                                                    className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary text-white rounded-2xl font-bold hover:opacity-90 transition shadow-sm text-base active:scale-[0.98]"
+                                                >
+                                                    <Play size={18} />게임 시작!
+                                                </button>
+                                                <button
+                                                    onClick={handleShuffle}
+                                                    className="flex items-center justify-center gap-2 w-full px-3 py-2.5 bg-gray-100 text-text-secondary rounded-2xl font-bold hover:bg-gray-200 transition text-sm active:scale-[0.98]"
+                                                >
+                                                    <Shuffle size={14} />위치 셔플
+                                                </button>
                                             </div>
                                         ) : (
                                             <div className="text-center">
-                                                <p className="text-sm text-gray-400"><span className="font-bold text-primary">{gameState?.hostName}</span>님이 시작하면 게임이 시작돼요</p>
+                                                <p className="text-sm text-text-secondary">
+                                                    <span className="font-bold text-primary">{gameState?.hostName}</span>님이 시작하면 게임이 시작돼요
+                                                </p>
                                                 <div className="mt-2 flex items-center justify-center gap-1">
                                                     <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                                                     <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -320,17 +365,28 @@ const RouletteModal: React.FC<RouletteModalProps> = ({
                                     </div>
                                 </div>
                             )}
+
+                            {/* 카운트다운 */}
                             {status === 'ready' && countdown !== null && countdown > 0 && (
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
                                     <span className="text-[120px] font-bold text-white countdown-pop drop-shadow-lg">{countdown}</span>
                                 </div>
                             )}
                         </div>
+
+                        {/* 하단 버튼 영역 */}
                         <div className="py-2 text-center shrink-0">
                             {status === 'waiting' && (
-                                <button onClick={onClose} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-xl font-bold transition text-sm"><X size={16} />대기실 나가기</button>
+                                <button
+                                    onClick={onClose}
+                                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-2xl font-bold transition text-sm active:scale-[0.98]"
+                                >
+                                    <X size={15} />대기실 나가기
+                                </button>
                             )}
-                            {status === 'playing' && <p className="text-gray-400 text-sm">🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!</p>}
+                            {status === 'playing' && (
+                                <p className="text-text-secondary text-sm">🎡 룰렛이 돌아가고 있어요... 마지막에 도착하면 커피 당첨!</p>
+                            )}
                         </div>
                     </div>
                 </div>
