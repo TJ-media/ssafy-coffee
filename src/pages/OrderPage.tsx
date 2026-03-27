@@ -15,8 +15,9 @@ import RouletteModal from '../features/roulette/ui/RouletteModal';
 import SettingsModal from '../features/order/ui/SettingsModal';
 import SearchBar from '../features/order/ui/SearchBar';
 import Toast from '../shared/ui/Toast';
+import OrderRedirectModal from '../shared/ui/OrderRedirectModal';
 import { updateHistoryApi, updateCartApi, addToCartApi, createInviteTokenApi, changeCafeApi } from '../features/order/api/firebaseApi';
-import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType } from '../shared/types';
+import { OrderHistory, RouletteHistory, HistoryItem, Menu, OptionType, GroupedCartItem } from '../shared/types';
 import { CAFE_LIST } from '../menuData';
 import { getCafeTheme } from '../shared/config/cafeTheme';
 
@@ -76,6 +77,11 @@ const OrderPage = () => {
     const [isCafeSelectOpen, setIsCafeSelectOpen] = useState(false);
     const [pendingCafe, setPendingCafe] = useState<string | null>(null);
     const [isCafeConfirmOpen, setIsCafeConfirmOpen] = useState(false);
+
+    // 주문 완료 모달 상태
+    const [isOrderConfirmOpen, setIsOrderConfirmOpen] = useState(false);
+    const [isOrderRedirectOpen, setIsOrderRedirectOpen] = useState(false);
+    const [orderSnapshot, setOrderSnapshot] = useState<{ items: GroupedCartItem[]; totalPrice: number } | null>(null);
 
     useEffect(() => {
         if (selectedCategory === '메뉴 추가') {
@@ -200,47 +206,64 @@ const OrderPage = () => {
         addToast('삭제되었습니다');
     };
 
-    const handleOrderComplete = async () => {
+    const handleOrderComplete = () => {
         if (!groupId || cart.length === 0) return;
-        if (!confirm('정말 주문을 완료하시겠습니까?')) return;
+        setIsOrderConfirmOpen(true);
+    };
+
+    const executeOrderComplete = async (openRedirect: boolean) => {
+        if (!groupId || cart.length === 0) return;
+        setIsOrderConfirmOpen(false);
+
+        // 리다이렉트 모달용 스냅샷 (카트 비우기 전에 캡처)
+        const itemMap: Record<string, HistoryItem> = {};
+        cart.forEach(cartItem => {
+            const key = `${cartItem.menuName}_${cartItem.option}`;
+            if (!itemMap[key]) {
+                itemMap[key] = {
+                    menuName: cartItem.menuName,
+                    option: cartItem.option,
+                    price: cartItem.price,
+                    count: 0,
+                    orderedBy: []
+                };
+            }
+            itemMap[key].count += 1;
+            itemMap[key].orderedBy.push(cartItem.userName);
+        });
+
+        const historyItems = Object.values(itemMap);
+        const participants = [...new Set(cart.map(c => c.userName))];
+        const snapshotItems: GroupedCartItem[] = historyItems.map(item => ({
+            menuName: item.menuName,
+            option: item.option,
+            price: item.price,
+            count: item.count,
+            names: item.orderedBy,
+        }));
+
+        const newHistory: OrderHistory = {
+            id: Date.now().toString(),
+            orderedAt: new Date(),
+            totalPrice: totalPrice,
+            totalItems: cart.length,
+            items: historyItems,
+            participants,
+            winner: null,
+            cafeName: CAFE_LIST.find(c => c.id === selectedCafe)?.name,
+        };
 
         try {
-            const itemMap: Record<string, HistoryItem> = {};
-            cart.forEach(cartItem => {
-                const key = `${cartItem.menuName}_${cartItem.option}`;
-                if (!itemMap[key]) {
-                    itemMap[key] = {
-                        menuName: cartItem.menuName,
-                        option: cartItem.option,
-                        price: cartItem.price,
-                        count: 0,
-                        orderedBy: []
-                    };
-                }
-                itemMap[key].count += 1;
-                itemMap[key].orderedBy.push(cartItem.userName);
-            });
-
-            const historyItems = Object.values(itemMap);
-            const participants = [...new Set(cart.map(c => c.userName))];
-
-            const newHistory: OrderHistory = {
-                id: Date.now().toString(),
-                orderedAt: new Date(),
-                totalPrice: totalPrice,
-                totalItems: cart.length,
-                items: historyItems,
-                participants,
-                winner: null,
-                cafeName: CAFE_LIST.find(c => c.id === selectedCafe)?.name,
-            };
-
-            const updatedHistory = [newHistory, ...history];
-            await updateHistoryApi(groupId, updatedHistory, 'normal');
+            await updateHistoryApi(groupId, [newHistory, ...history], 'normal');
             await updateCartApi(groupId, []);
 
             setIsCartOpen(false);
             addToast('주문이 완료되었습니다!', 'success');
+
+            if (openRedirect) {
+                setOrderSnapshot({ items: snapshotItems, totalPrice });
+                setIsOrderRedirectOpen(true);
+            }
         } catch (e) {
             console.error('주문 완료 실패:', e);
             addToast('주문 완료에 실패했습니다.', 'warning');
@@ -491,6 +514,54 @@ const OrderPage = () => {
                     onClose={() => setIsCartOpen(false)}
                     onEdit={() => { }}
                     selectedCafe={selectedCafe}
+                />
+            )}
+
+            {/* 주문 완료 확인 모달 */}
+            {isOrderConfirmOpen && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" onClick={() => setIsOrderConfirmOpen(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6 animate-bounce-in">
+                        <div className="text-center">
+                            <div className="text-4xl mb-3">🛒</div>
+                            <h3 className="text-lg font-bold mb-2">주문을 완료할까요?</h3>
+                            <p className="text-sm text-gray-500 mb-5">
+                                주문 기록이 저장되고<br />장바구니가 비워집니다.
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={() => executeOrderComplete(true)}
+                                className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98]"
+                            >
+                                기록하고 주문하러 가기
+                            </button>
+                            <button
+                                onClick={() => executeOrderComplete(false)}
+                                className="w-full py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition active:scale-[0.98]"
+                            >
+                                기록만 할게요
+                            </button>
+                            <button
+                                onClick={() => setIsOrderConfirmOpen(false)}
+                                className="w-full py-2 text-gray-400 text-sm hover:text-gray-600 transition"
+                            >
+                                취소
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 주문 앱 연동 모달 */}
+            {orderSnapshot && (
+                <OrderRedirectModal
+                    isOpen={isOrderRedirectOpen}
+                    onClose={() => { setIsOrderRedirectOpen(false); setOrderSnapshot(null); }}
+                    cafeName={CAFE_LIST.find(c => c.id === selectedCafe)?.name || ''}
+                    cafeId={selectedCafe}
+                    orderItems={orderSnapshot.items}
+                    totalPrice={orderSnapshot.totalPrice}
                 />
             )}
 
