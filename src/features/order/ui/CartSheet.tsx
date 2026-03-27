@@ -2,6 +2,7 @@ import { useMemo, RefObject } from 'react';
 import { CartItem, GroupedCartItem, OptionType } from '../../../shared/types';
 import { ShoppingCart, CheckCircle, ChevronDown, Plus, Minus } from 'lucide-react';
 import { getAvatarColor, getTextContrastColor } from '../../../shared/utils';
+import { getCafeTheme } from '../../../shared/config/cafeTheme';
 
 interface Props {
     cart: CartItem[];
@@ -14,12 +15,14 @@ interface Props {
     onClear: () => void;
     onClose: () => void;
     onEdit: (item: CartItem) => void;
+    selectedCafe?: string;
 }
 
 const CartSheet = ({
     cart, totalPrice, userName, cartSheetRef,
-    onRemove, onAdd, onClear, onClose
+    onRemove, onAdd, onClear, onClose, selectedCafe
 }: Props) => {
+    const theme = getCafeTheme(selectedCafe || 'mega');
 
     const groupedCart = useMemo(() => {
         return cart.reduce<Record<string, GroupedCartItem>>((acc, item) => {
@@ -57,7 +60,7 @@ const CartSheet = ({
                 <div className="flex justify-between items-center mb-4 shrink-0">
                     <div ref={cartSheetRef}>
                         <h3 className="text-lg font-bold flex items-center gap-2 text-text-primary">
-                            <ShoppingCart size={20} /> 장바구니 <span className="text-primary">{cart.length}</span>
+                            <ShoppingCart size={20} /> 장바구니 <span className={theme.primaryTextColor}>{cart.length}</span>
                         </h3>
                     </div>
                     <div className="flex items-center gap-3">
@@ -128,7 +131,7 @@ const CartSheet = ({
                 <button
                     onClick={onClear}
                     disabled={cart.length === 0}
-                    className={`w-full py-4 rounded-xl flex justify-center items-center gap-2 font-bold text-lg shrink-0 transition-colors ${cart.length > 0 ? 'bg-primary text-white hover:bg-primary-dark shadow-md' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                    className={`w-full py-4 rounded-xl flex justify-center items-center gap-2 font-bold text-lg shrink-0 transition-colors ${cart.length > 0 ? `${theme.primaryColor} text-white shadow-md` : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                 >
                     <CheckCircle size={20} /> 주문 완료
                 </button>
