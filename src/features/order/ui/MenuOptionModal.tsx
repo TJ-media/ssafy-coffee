@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Menu, OptionType, CupSize } from '../../../shared/types';
 import { X, Snowflake, Flame, Plus, Minus, CupSoda, ChevronDown, ChevronRight, Store, MapPin } from 'lucide-react';
+import MenuIcon from '../../../shared/components/MenuIcon';
 
 interface AddonSelection {
     menu: Menu;
@@ -181,7 +182,14 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
 
                 <div className="px-6 pt-2 pb-4 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="text-4xl">{menu.img}</div>
+                        <MenuIcon
+                            menuName={menu.name}
+                            categoryUpper={menu.categoryUpper}
+                            categoryLower={menu.categoryLower}
+                            option={selectedOption}
+                            hasOption={menu.hasOption}
+                            size={44}
+                        />
                         <div>
                             <h3 className="text-lg font-bold text-gray-800">{menu.name}</h3>
                             <p className="text-sm text-gray-500">{menu.categoryUpper}{menu.categoryLower && menu.categoryUpper !== '추가' ? ` · ${menu.categoryLower}` : ''}</p>
@@ -324,7 +332,7 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                                                     onClick={() => toggleAddon(addon)}
                                                 >
                                                     <div className="flex items-center gap-2.5">
-                                                        <span className="text-lg">{addon.img}</span>
+                                                        <MenuIcon menuName={addon.name} categoryUpper={addon.categoryUpper} categoryLower={addon.categoryLower} size={22} />
                                                         <span className={`text-sm font-bold ${selected ? 'text-gray-800' : 'text-gray-600'}`}>{addon.name}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
@@ -359,7 +367,7 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                                                     className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-lg">{items[0].img}</span>
+                                                        <MenuIcon menuName={items[0].name} categoryUpper={items[0].categoryUpper} categoryLower={items[0].categoryLower} size={22} />
                                                         <span className="text-sm font-bold text-gray-700">{groupName}</span>
                                                         {selectedInGroup.length > 0 && (
                                                             <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full font-bold">
@@ -520,7 +528,7 @@ const MenuOptionModal: React.FC<Props> = ({ isOpen, menu, addonMenus, onClose, o
                                                         onClick={() => toggleAddon(addon)}
                                                     >
                                                         <div className="flex items-center gap-2.5">
-                                                            <span className="text-lg">{addon.img}</span>
+                                                            <MenuIcon menuName={addon.name} categoryUpper={addon.categoryUpper} categoryLower={addon.categoryLower} size={22} />
                                                             <span className={`text-sm font-bold ${selected ? 'text-gray-800' : 'text-gray-600'}`}>
                                                                 {addon.name}
                                                             </span>
