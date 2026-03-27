@@ -92,6 +92,7 @@ const OrderRedirectModal: React.FC<OrderRedirectModalProps> = ({
 
     const totalCount = orderItems.reduce((sum, item) => sum + item.count, 0);
     const hasDeepLink = !!CAFE_DEEP_LINKS[cafeId];
+    const webOrderUrl = CAFE_DEEP_LINKS[cafeId]?.webOrder;
 
     return createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -157,10 +158,17 @@ const OrderRedirectModal: React.FC<OrderRedirectModalProps> = ({
                     <div className="px-5 pb-3">
                         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 flex gap-2">
                             <Smartphone size={15} className="text-blue-500 shrink-0 mt-0.5" />
-                            <p className="text-xs text-blue-600 leading-relaxed">
-                                PC에서는 앱을 직접 열 수 없습니다.<br />
-                                복사된 주문 목록을 모바일 기기의 카페 앱에서 사용해주세요.
-                            </p>
+                            {webOrderUrl ? (
+                                <p className="text-xs text-blue-600 leading-relaxed">
+                                    웹 주문 페이지로 이동하거나,<br />
+                                    복사된 주문 목록을 모바일 앱에서 사용하세요.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-blue-600 leading-relaxed">
+                                    PC에서는 앱을 직접 열 수 없습니다.<br />
+                                    복사된 주문 목록을 모바일 기기의 카페 앱에서 사용해주세요.
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}
@@ -173,15 +181,25 @@ const OrderRedirectModal: React.FC<OrderRedirectModalProps> = ({
                                 onClick={onClose}
                                 className="flex-1 py-3.5 rounded-2xl bg-gray-100 text-text-secondary font-bold text-sm hover:bg-gray-200 transition active:scale-[0.98]"
                             >
-                                닫기
+                                {webOrderUrl ? '나중에 할게요' : '닫기'}
                             </button>
-                            <button
-                                onClick={copyToClipboard}
-                                className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
-                            >
-                                <Copy size={14} />
-                                주문 목록 복사
-                            </button>
+                            {webOrderUrl ? (
+                                <button
+                                    onClick={() => window.open(webOrderUrl, '_blank')}
+                                    className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <ExternalLink size={14} />
+                                    웹으로 주문하기
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={copyToClipboard}
+                                    className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 transition active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <Copy size={14} />
+                                    주문 목록 복사
+                                </button>
+                            )}
                         </>
                     ) : (
                         <>
