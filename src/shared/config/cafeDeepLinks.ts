@@ -1,5 +1,4 @@
 // 카페별 딥링크 / 앱스토어 링크 설정
-// 실제 스킴은 각 앱의 AndroidManifest/Info.plist 확인 후 조정 필요
 
 export interface CafeDeepLink {
   /** Android intent URL */
@@ -11,38 +10,41 @@ export interface CafeDeepLink {
     android: string;
     ios: string;
   };
+  /** 웹 주문 URL (데스크톱에서 사용, 바나프레소 등) */
+  webOrder?: string;
 }
 
 export const CAFE_DEEP_LINKS: Record<string, CafeDeepLink> = {
   mega: {
-    android: 'intent://main/#Intent;scheme=megacoffee;package=com.megacoffee.app;end',
+    android: 'intent://open/#Intent;scheme=megacoffee;package=co.kr.waldlust.megacoffee;end',
     ios: 'megacoffee://',
     fallback: {
-      android: 'market://details?id=com.megacoffee.app',
-      ios: 'https://apps.apple.com/kr/app/id1474883803',
+      android: 'https://play.google.com/store/apps/details?id=co.kr.waldlust.megacoffee',
+      ios: 'https://apps.apple.com/kr/app/id1473428031',
     },
   },
   starbucks: {
-    android: 'intent://main/#Intent;scheme=starbucks;package=com.starbucks.co;end',
+    android: 'intent://open/#Intent;scheme=starbucks;package=com.starbucks.co;end',
     ios: 'starbucks://',
     fallback: {
-      android: 'market://details?id=com.starbucks.co',
-      ios: 'https://apps.apple.com/kr/app/id450353456',
+      android: 'https://play.google.com/store/apps/details?id=com.starbucks.co',
+      ios: 'https://apps.apple.com/kr/app/id585076744',
     },
   },
   banapresso: {
-    android: 'intent://main/#Intent;scheme=banapresso;package=com.banapresso.android;end',
-    ios: 'banapresso://',
+    android: 'intent://app-deep-link#Intent;scheme=banapressoAppDeep;package=com.banaple.foodproapp.banapresso;end',
+    ios: 'banapapp://',
     fallback: {
-      android: 'market://details?id=com.banapresso.android',
-      ios: 'https://apps.apple.com/kr/app/id1438259595',
+      android: 'https://play.google.com/store/apps/details?id=com.banaple.foodproapp.banapresso',
+      ios: 'https://apps.apple.com/kr/app/id1319211939',
     },
+    webOrder: 'https://order.banapresso.com/#COFFEE',
   },
   compose: {
-    android: 'intent://main/#Intent;scheme=composecoffee;package=com.compose.coffee;end',
+    android: 'intent://open/#Intent;scheme=composecoffee;package=com.compose.coffee;end',
     ios: 'composecoffee://',
     fallback: {
-      android: 'market://details?id=com.compose.coffee',
+      android: 'https://play.google.com/store/apps/details?id=com.compose.coffee',
       ios: 'https://apps.apple.com/kr/app/id1611916573',
     },
   },
