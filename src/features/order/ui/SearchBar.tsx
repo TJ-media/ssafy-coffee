@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo } from 'react';
 import { Search, X, ArrowLeft } from 'lucide-react';
 import { Menu } from '../../../shared/types';
 import { isEnglishInput } from '../../../shared/utils/engToKor';
+import MenuIcon from '../../../shared/components/MenuIcon';
 
 interface Props {
     searchQuery: string;
@@ -131,8 +132,15 @@ const SearchBar: React.FC<Props> = ({
                                     className="w-full flex items-center gap-3 px-6 py-3 hover:bg-blue-50/50 active:bg-blue-100/50 transition-colors text-left border-b border-gray-50 last:border-b-0"
                                 >
                                     {/* 메뉴 아이콘 */}
-                                    <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-xl shrink-0">
-                                        {menu.img}
+                                    <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center shrink-0">
+                                        <MenuIcon
+                                            menuName={menu.name}
+                                            categoryUpper={menu.categoryUpper}
+                                            categoryLower={menu.categoryLower}
+                                            option={menu.hasOption ? undefined : menu.defaultOption}
+                                            hasOption={menu.hasOption}
+                                            size={32}
+                                        />
                                     </div>
 
                                     {/* 메뉴 정보 */}

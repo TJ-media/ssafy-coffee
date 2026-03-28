@@ -4,6 +4,7 @@ import { Heart, Plus, Coffee, History, Trash2, Snowflake, Flame, Send, MessageSq
 import { submitMenuRequest } from '../api/menuRequestApi';
 import { useLayoutStore } from '../../../shared/store/useLayoutStore';
 import { getCafeTheme } from '../../../shared/config/cafeTheme';
+import MenuIcon from '../../../shared/components/MenuIcon';
 
 interface Props {
     selectedCategory: string;
@@ -390,8 +391,15 @@ const MenuGrid: React.FC<Props> = ({
                         className="bg-white px-4 py-3.5 rounded-2xl shadow-sm flex items-center gap-4 transition hover:-translate-y-0.5 relative group cursor-pointer"
                     >
                         {/* 좌측 이모지 (원형 배경) */}
-                        <div className={`w-14 h-14 ${theme.primaryBgLight} rounded-full flex items-center justify-center text-3xl shrink-0`}>
-                            {menu.img}
+                        <div className={`w-14 h-14 ${theme.primaryBgLight} rounded-full flex items-center justify-center shrink-0`}>
+                            <MenuIcon
+                                menuName={menu.name}
+                                categoryUpper={menu.categoryUpper}
+                                categoryLower={menu.categoryLower}
+                                option={menu.hasOption ? undefined : menu.defaultOption}
+                                hasOption={menu.hasOption}
+                                size={40}
+                            />
                         </div>
 
                         {/* 중앙 메뉴 정보 */}
@@ -447,7 +455,16 @@ const MenuGrid: React.FC<Props> = ({
                         <Heart size={20} className={`${favoriteMenuIds.includes(menu.id) ? 'text-red-500 fill-red-500' : 'text-gray-300'} transition-colors`} />
                     </button>
 
-                    <div className="text-5xl mb-3">{menu.img}</div>
+                    <div className="mb-3 flex justify-center">
+                        <MenuIcon
+                            menuName={menu.name}
+                            categoryUpper={menu.categoryUpper}
+                            categoryLower={menu.categoryLower}
+                            option={menu.hasOption ? undefined : menu.defaultOption}
+                            hasOption={menu.hasOption}
+                            size={56}
+                        />
+                    </div>
 
                     {selectedSubCategory === '전체' && menu.categoryLower && menu.categoryUpper !== '추가' && (
                         <span className={`text-[10px] ${theme.priceTextColor} ${theme.primaryBgLight} px-2 py-0.5 rounded-full mb-1 font-bold`}>{menu.categoryLower}</span>
