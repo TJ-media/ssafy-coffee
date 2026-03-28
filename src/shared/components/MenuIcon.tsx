@@ -43,8 +43,8 @@ function selectShape(
     return 'snack';
   }
 
-  if (['프라페', '스무디', '블렌디드', '쉐이크', '바나치노'].some(k => lower.includes(k))) return 'frappe';
-  if (['에이드', '피지오', '리프레셔'].some(k => lower.includes(k))) return 'glass';
+  if (['프라페', '스무디', '블렌디드', '쉐이크', '바나치노'].some(k => combined.includes(k))) return 'frappe';
+  if (['에이드', '피지오', '리프레셔'].some(k => combined.includes(k))) return 'glass';
   if (['티', '티 음료', '티 & 에이드'].includes(upper) && !lower.includes('에이드')) return 'teacup';
   if (option === 'HOT') return 'mug';
 
@@ -142,47 +142,62 @@ function Mug({ liquid, option }: { liquid: string; option?: OptionType }) {
 }
 
 // ---------------------------------------------------------------------------
-// SHAPE: frappe — wide cup filled to brim with blended ice drink
+// SHAPE: frappe — tall glass with smooth blended slush + citrus garnish
 // ---------------------------------------------------------------------------
 function Frappe({ liquid, accent, clipId }: { liquid: string; accent: string; clipId: string }) {
-  // Wider cup (smoothie style), no lid, liquid+ice fills to the rim
   return (
     <>
       <defs>
         <clipPath id={clipId}>
-          <polygon points="9,16 39,16 36,42 12,42" />
+          <polygon points="11,10 37,10 34,43 14,43" />
         </clipPath>
       </defs>
 
-      {/* Rim */}
-      <rect x="7" y="13" width="34" height="4" rx="2" fill="#DCDCDC" />
+      {/* Glass body */}
+      <polygon points="11,10 37,10 34,43 14,43" fill="rgba(255,255,255,0.12)" stroke="#C0C0C0" strokeWidth="0.9" />
 
-      {/* Cup body — filled with blended liquid to the brim */}
-      <polygon points="9,16 39,16 36,42 12,42" fill={liquid} opacity={0.82} />
+      {/* Blended liquid fill */}
+      <polygon points="11,10 37,10 34,43 14,43" fill={liquid} opacity={0.85} />
 
-      {/* Crushed ice chunks scattered throughout */}
-      <g clipPath={`url(#${clipId})`}>
-        <rect x="10" y="17" width="8" height="6" rx="1.8" fill="white" opacity={0.72} transform="rotate(-14, 14, 20)" />
-        <rect x="22" y="15" width="7" height="5" rx="1.5" fill="white" opacity={0.65} transform="rotate(9, 25.5, 17.5)" />
-        <rect x="31" y="19" width="7" height="6" rx="1.8" fill="white" opacity={0.7} transform="rotate(-7, 34.5, 22)" />
-        <rect x="13" y="28" width="7" height="5" rx="1.5" fill="white" opacity={0.62} transform="rotate(16, 16.5, 30.5)" />
-        <rect x="24" y="30" width="8" height="5" rx="1.8" fill="white" opacity={0.68} transform="rotate(-10, 28, 32.5)" />
-        <rect x="31" y="35" width="6" height="5" rx="1.5" fill="white" opacity={0.6} transform="rotate(5, 34, 37.5)" />
-        <rect x="11" y="37" width="7" height="4" rx="1.5" fill="white" opacity={0.58} transform="rotate(-8, 14.5, 39)" />
+      {/* Fine slush texture dots */}
+      <g clipPath={`url(#${clipId})`} opacity={0.38}>
+        <circle cx="17" cy="15" r="1.5" fill="white" />
+        <circle cx="28" cy="13" r="1.2" fill="white" />
+        <circle cx="33" cy="19" r="1.4" fill="white" />
+        <circle cx="14" cy="25" r="1.1" fill="white" />
+        <circle cx="23" cy="22" r="1.6" fill="white" />
+        <circle cx="32" cy="28" r="1.3" fill="white" />
+        <circle cx="18" cy="33" r="1.4" fill="white" />
+        <circle cx="28" cy="37" r="1.2" fill="white" />
+        <circle cx="15" cy="40" r="1.1" fill="white" />
       </g>
 
-      {/* Slightly wavy blended surface on top */}
-      <path d="M9,16 Q12,13 16,16 Q20,13 24,16 Q28,13 32,16 Q36,13 39,16"
-        fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Left glass highlight */}
+      <line x1="13.5" y1="13" x2="15.5" y2="41" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" />
 
-      {/* Cup outline */}
-      <polygon points="9,16 39,16 36,42 12,42" fill="none" stroke="#C0C0C0" strokeWidth="1" />
+      {/* Domed top surface of blended drink */}
+      <ellipse cx="24" cy="9.5" rx="13" ry="3.5" fill={liquid} opacity={0.9} />
+
+      {/* Rim strip */}
+      <rect x="10" y="8" width="28" height="3.5" rx="1.5" fill="#DCDCDC" opacity={0.85} />
+
+      {/* Glass outline over content */}
+      <polygon points="11,10 37,10 34,43 14,43" fill="none" stroke="#C0C0C0" strokeWidth="0.9" />
 
       {/* Base */}
-      <rect x="12" y="42" width="24" height="2" rx="1" fill="#C8C8C8" />
+      <rect x="14" y="43" width="20" height="2" rx="1" fill="#C4C4C4" />
 
       {/* Straw */}
-      <line x1="32" y1="14" x2="36" y2="2" stroke={accent} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="32" y1="9" x2="36" y2="1" stroke={accent} strokeWidth="2.5" strokeLinecap="round" />
+
+      {/* Citrus garnish — lemon/lime slice perched on right rim */}
+      <circle cx="37" cy="7" r="6.5" fill="#FFDA44" />
+      <circle cx="37" cy="7" r="5" fill="white" opacity={0.5} />
+      <line x1="37" y1="0.5" x2="37" y2="13.5" stroke="#CC8800" strokeWidth="0.8" opacity={0.75} />
+      <line x1="31.4" y1="3.7" x2="42.6" y2="10.3" stroke="#CC8800" strokeWidth="0.8" opacity={0.75} />
+      <line x1="31.4" y1="10.3" x2="42.6" y2="3.7" stroke="#CC8800" strokeWidth="0.8" opacity={0.75} />
+      <circle cx="37" cy="7" r="1.8" fill="#FFAA00" opacity={0.65} />
+      <circle cx="37" cy="7" r="6.5" fill="none" stroke="#CC8800" strokeWidth="0.7" />
     </>
   );
 }
@@ -284,68 +299,102 @@ function Bottle({ liquid, accent, clipId }: { liquid: string; accent: string; cl
 }
 
 // ---------------------------------------------------------------------------
-// SHAPE: cake — 조각 케이크 (trapezoid cross-section with layers)
+// SHAPE: cake — 조각 케이크 (우상단 뷰)
+//
+//         P3 (꼭짓점, 케이크 중심)
+//        / \
+//     a /   \ b     ← 같은 길이, 단면
+//      /     \
+//    P1-------P2
+//        c          ← 바깥 곡면
+//
+// 정면: 변a (P1→P3) 직사각형 — 단면 레이어
+// 윗면: 삼각형 P1→P3→P2, P2는 좌상단으로 빠짐
+// 변b, c: 안보임
 // ---------------------------------------------------------------------------
 function Cake({ liquid, accent }: { liquid: string; accent: string }) {
-  // Trapezoid: bottom (8,40)-(40,40), top (16,15)-(32,15)
-  // Layers computed at interpolated x-coords:
-  //   y=19: left≈14.8→15,  right≈33.2→33
-  //   y=27: left≈12.1→12,  right≈35.9→36
-  //   y=29: left≈11.5,     right≈36.5
+  // P1(바깥모서리, 좌)=(8,22), P3(꼭짓점, 우)=(34,22)
+  // 정면(변a): (8,22)-(34,22)-(34,44)-(8,44)  w=26, h=22
+  // P2(뒤쪽, 좌상단)=(16,14)
+  // 윗면삼각형: (8,22)-(34,22)-(16,14)
+
   return (
     <>
-      {/* Plate */}
-      <ellipse cx="24" cy="43" rx="17" ry="3.5" fill="#E8E8E8" stroke="#D4D4D4" strokeWidth="0.6" />
+      {/* 접시 */}
+      <ellipse cx="22" cy="46" rx="18" ry="2" fill="#E8E8E8" stroke="#D0D0D0" strokeWidth="0.6" />
 
-      {/* Lower sponge (widest layer) */}
-      <polygon points="8,40 40,40 36.5,29 11.5,29" fill={liquid} opacity={0.9} />
+      {/* 윗면 — 삼각형 (P1→P3→P2, 화이트 프로스팅) */}
+      <polygon points="8,22 34,22 16,14" fill="white" stroke="#E8E0D8" strokeWidth="0.5" />
 
-      {/* Cream divider */}
-      <polygon points="11.5,29 36.5,29 36,27 12,27" fill="white" opacity={0.92} />
+      {/* 정면 — 변a (P1→P3, 흰 프로스팅 프레임 + 내부 레이어) */}
+      <rect x="8" y="22" width="26" height="22" fill="white" />
 
-      {/* Upper sponge */}
-      <polygon points="12,27 36,27 33,19 15,19" fill={liquid} opacity={0.9} />
+      {/* 레이어 (프로스팅 테두리 2px 안쪽) */}
+      {/* 스펀지 1 (y=24→29) */}
+      <rect x="10" y="24" width="22" height="5" fill={liquid} opacity={0.82} />
 
-      {/* Frosting band */}
-      <polygon points="15,19 33,19 32,15 16,15" fill={accent} opacity={0.82} />
+      {/* 크림 + 딸기 (y=29→31) */}
+      <rect x="10" y="29" width="22" height="2" fill="#FFF8F2" />
+      <ellipse cx="16" cy="30" rx="2.2" ry="0.8" fill="#FFB0B8" opacity={0.65} />
+      <ellipse cx="25" cy="30" rx="2" ry="0.7" fill="#FFB0B8" opacity={0.55} />
 
-      {/* Wavy frosting top */}
-      <path d="M16,15 Q18,11.5 20,15 Q22,11.5 24,15 Q26,11.5 28,15 Q30,11.5 32,15"
-        fill="none" stroke={accent} strokeWidth="2.2" strokeLinecap="round" />
+      {/* 스펀지 2 (y=31→36) */}
+      <rect x="10" y="31" width="22" height="5" fill={liquid} opacity={0.82} />
 
-      {/* Full outline */}
-      <polygon points="8,40 40,40 32,15 16,15" fill="none" stroke="#C8C8C8" strokeWidth="0.9" />
+      {/* 크림 + 딸기 (y=36→38) */}
+      <rect x="10" y="36" width="22" height="2" fill="#FFF8F2" />
+      <ellipse cx="17" cy="37" rx="2.5" ry="0.8" fill="#FFB0B8" opacity={0.7} />
+      <ellipse cx="26" cy="37" rx="2.2" ry="0.7" fill="#FFB0B8" opacity={0.6} />
 
-      {/* Cherry on top */}
-      <circle cx="24" cy="8" r="3.5" fill="#FF6B8A" />
-      <path d="M24,4.5 Q22,1 23.5,0" stroke="#5CB85C" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      {/* 스펀지 3 (y=38→44) */}
+      <rect x="10" y="38" width="22" height="6" fill={liquid} opacity={0.82} />
+
+      {/* 정면 아웃라인 */}
+      <rect x="8" y="22" width="26" height="22" fill="none" stroke={accent} strokeWidth="0.7" opacity={0.25} />
+
+      {/* 휘핑크림 (윗면 위, 삼각형 안쪽) */}
+      <ellipse cx="20" cy="18.5" rx="4" ry="1.8" fill="white" stroke="#E8E0D8" strokeWidth="0.3" />
+      <ellipse cx="20" cy="17.8" rx="2.8" ry="1.3" fill="white" />
+      <ellipse cx="20" cy="17.5" rx="1.6" ry="0.8" fill="#FAFAFA" />
+
+      {/* 딸기 */}
+      <ellipse cx="20" cy="16" rx="3" ry="2.5" fill="#FF4B5C" />
+      <circle cx="18.5" cy="15.5" r="0.35" fill="#FF8A94" opacity={0.7} />
+      <circle cx="20.8" cy="14.8" r="0.35" fill="#FF8A94" opacity={0.7} />
+      <circle cx="19.5" cy="17.3" r="0.35" fill="#FF8A94" opacity={0.6} />
+      <circle cx="21.5" cy="16.7" r="0.3" fill="#FF8A94" opacity={0.6} />
+      <path d="M19,13.8 L20,12.3 L21,13.8" fill="#4CAF50" stroke="#388E3C" strokeWidth="0.5" />
+      <path d="M18.3,14.3 L19.5,12.6" stroke="#4CAF50" strokeWidth="0.6" strokeLinecap="round" fill="none" />
+      <path d="M21.7,14.3 L20.5,12.6" stroke="#4CAF50" strokeWidth="0.6" strokeLinecap="round" fill="none" />
     </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// SHAPE: snack — 쿠키/과자 (two overlapping round cookies)
+// SHAPE: snack — 쿠키/과자 (two overlapping cookies, large irregular chips)
 // ---------------------------------------------------------------------------
 function Snack(): React.ReactElement {
-  // Fixed warm cookie colors — not tied to menu liquid/accent
   return (
     <>
-      {/* Back cookie */}
-      <circle cx="28" cy="25" r="13" fill="#E8C87A" stroke="#C4A050" strokeWidth="0.9" />
-      <circle cx="25" cy="21" r="2.2" fill="#6B4423" />
-      <circle cx="31" cy="25" r="2.2" fill="#6B4423" />
-      <circle cx="25" cy="30" r="2.2" fill="#6B4423" />
-      <circle cx="33" cy="19" r="1.6" fill="#6B4423" />
+      {/* Back cookie — darker golden amber */}
+      <circle cx="27" cy="22" r="12" fill="#A06818" stroke="#7A5010" strokeWidth="0.9" />
+      {/* Back chips — visible in upper portion above front cookie */}
+      <ellipse cx="30" cy="15" rx="3.5" ry="1.8" fill="#1C0E05" opacity={0.88} transform="rotate(-22, 30, 15)" />
+      <rect x="21.5" y="13" width="4" height="2.3" rx="0.6" fill="#1C0E05" opacity={0.88} transform="rotate(8, 23.5, 14.15)" />
+      <ellipse cx="35" cy="20" rx="1.8" ry="2.8" fill="#1C0E05" opacity={0.88} transform="rotate(15, 35, 20)" />
 
-      {/* Front cookie */}
-      <circle cx="20" cy="27" r="13" fill="#F0D080" stroke="#C4A050" strokeWidth="0.9" />
-      <circle cx="16" cy="23" r="2.2" fill="#3C2415" />
-      <circle cx="23" cy="25" r="2.2" fill="#3C2415" />
-      <circle cx="15" cy="30" r="2.2" fill="#3C2415" />
-      <circle cx="22" cy="32" r="2.2" fill="#3C2415" />
+      {/* Front cookie — lighter golden amber */}
+      <circle cx="21" cy="30" r="13" fill="#C8922E" stroke="#946818" strokeWidth="0.9" />
+      {/* Front chips — large and irregular */}
+      <ellipse cx="15" cy="23" rx="3.8" ry="2" fill="#1C0E05" transform="rotate(-30, 15, 23)" />
+      <rect x="22" y="21.5" width="4.5" height="2.5" rx="0.6" fill="#1C0E05" transform="rotate(15, 24.25, 22.75)" />
+      <ellipse cx="13" cy="31" rx="2" ry="3.2" fill="#1C0E05" transform="rotate(20, 13, 31)" />
+      <polygon points="21,33 25,32.5 25.5,36 21.5,36.5" fill="#1C0E05" />
+      <ellipse cx="18" cy="38" rx="3.2" ry="1.6" fill="#1C0E05" transform="rotate(-15, 18, 38)" />
+      <rect x="25.5" y="37" width="3.2" height="2" rx="0.5" fill="#1C0E05" transform="rotate(10, 27.1, 38)" />
 
-      {/* Highlight */}
-      <circle cx="15" cy="21" r="3.5" fill="white" opacity={0.22} />
+      {/* Highlight on front cookie */}
+      <circle cx="15" cy="24" r="4" fill="white" opacity={0.16} />
     </>
   );
 }
@@ -370,13 +419,14 @@ function SetMenu({ liquid, accent, clipId }: { liquid: string; accent: string; c
       <rect x="1" y="40" width="20" height="1.5" rx="0.75" fill="#C8C8C8" />
       <line x1="16" y1="11" x2="19" y2="4" stroke={accent} strokeWidth="2" strokeLinecap="round" />
 
-      {/* === Mini cookie (right) === */}
-      <circle cx="36" cy="28" r="12" fill="#F0D080" stroke="#C4A050" strokeWidth="0.8" />
-      <circle cx="33" cy="24" r="2" fill="#3C2415" />
-      <circle cx="39" cy="26" r="2" fill="#3C2415" />
-      <circle cx="33" cy="31" r="2" fill="#3C2415" />
-      <circle cx="38" cy="33" r="2" fill="#3C2415" />
-      <circle cx="32" cy="22" r="2.8" fill="white" opacity={0.2} />
+      {/* === Mini cookie (right, darker amber + prominent irregular chips) === */}
+      <circle cx="36" cy="28" r="12" fill="#A06818" stroke="#7A5010" strokeWidth="0.8" />
+      <ellipse cx="32.5" cy="23" rx="3" ry="1.6" fill="#1C0E05" transform="rotate(-22, 32.5, 23)" />
+      <rect x="37" y="23" width="4" height="2.2" rx="0.5" fill="#1C0E05" transform="rotate(10, 39, 24.1)" />
+      <ellipse cx="32" cy="31" rx="1.6" ry="2.4" fill="#1C0E05" transform="rotate(20, 32, 31)" />
+      <polygon points="37.5,30.5 41,30 41.5,33 38,33.5" fill="#1C0E05" />
+      <rect x="33" y="36" width="3.5" height="1.8" rx="0.4" fill="#1C0E05" transform="rotate(-10, 34.75, 36.9)" />
+      <circle cx="33.5" cy="22" r="2.5" fill="white" opacity={0.18} />
     </>
   );
 }
@@ -441,17 +491,17 @@ const MenuIcon: React.FC<MenuIconProps> = React.memo(({
 
   const renderShape = () => {
     switch (shape) {
-      case 'tallCup':  return <TallCup liquid={liquid} accent={accent} option={option} clipId={clipId} />;
-      case 'mug':      return <Mug liquid={liquid} option={option} />;
-      case 'frappe':   return <Frappe liquid={liquid} accent={accent} clipId={clipId} />;
-      case 'glass':    return <Glass liquid={liquid} option={option} clipId={clipId} />;
-      case 'teacup':   return <Teacup liquid={liquid} accent={accent} clipId={clipId} />;
-      case 'bottle':   return <Bottle liquid={liquid} accent={accent} clipId={clipId} />;
-      case 'cake':     return <Cake liquid={liquid} accent={accent} />;
-      case 'snack':    return <Snack />;
-      case 'setMenu':  return <SetMenu liquid={liquid} accent={accent} clipId={clipId} />;
+      case 'tallCup': return <TallCup liquid={liquid} accent={accent} option={option} clipId={clipId} />;
+      case 'mug': return <Mug liquid={liquid} option={option} />;
+      case 'frappe': return <Frappe liquid={liquid} accent={accent} clipId={clipId} />;
+      case 'glass': return <Glass liquid={liquid} option={option} clipId={clipId} />;
+      case 'teacup': return <Teacup liquid={liquid} accent={accent} clipId={clipId} />;
+      case 'bottle': return <Bottle liquid={liquid} accent={accent} clipId={clipId} />;
+      case 'cake': return <Cake liquid={liquid} accent={accent} />;
+      case 'snack': return <Snack />;
+      case 'setMenu': return <SetMenu liquid={liquid} accent={accent} clipId={clipId} />;
       case 'giftCard': return <GiftCard accent={accent} />;
-      case 'addon':    return <Addon accent={accent} />;
+      case 'addon': return <Addon accent={accent} />;
     }
   };
 
